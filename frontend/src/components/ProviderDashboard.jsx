@@ -1,58 +1,30 @@
-import React, { useState, useEffect } from 'react';
-import { FaMapMarkerAlt, FaUserCircle, FaPhone, FaEnvelope, FaHome, FaCalendarAlt, FaSignOutAlt, FaQuestionCircle, FaRegComments } from 'react-icons/fa';
+import React, { useState } from 'react';
+import { FaUserCircle, FaHome, FaCalendarAlt, FaSignOutAlt, FaQuestionCircle, FaRegComments, FaEdit, FaTrash, FaPlus } from 'react-icons/fa';
 import './ProviderDashboard.css';
 
-// Mock data for customers
-const mockCustomers = [
-  {
-    id: 1,
-    name: 'Alice Johnson',
-    phone: '+1234567890',
-    email: 'alice@email.com',
-    category: 'Plumbing'
-  },
-  {
-    id: 2,
-    name: 'Bob Smith',
-    phone: '+1987654321',
-    email: 'bob@email.com',
-    category: 'Electrical'
-  },
-  {
-    id: 3,
-    name: 'Carol Lee',
-    phone: '+1472583690',
-    email: 'carol@email.com',
-    category: 'Carpentry'
-  },
-  {
-    id: 4,
-    name: 'David King',
-    phone: '+1357924680',
-    email: 'david@email.com',
-    category: 'Cleaning'
-  },
-  {
-    id: 5,
-    name: 'Emma Brown',
-    phone: '+1122334455',
-    email: 'emma@email.com',
-    category: 'Appliance Repair'
+const categories = ['Plumbing', 'Electrical', 'Carpentry', 'Cleaning', 'Appliance Repair', 'Others'];
+
+// Time dropdown options: 12-hour format
+function generateTimeOptions() {
+  const times = [];
+  for (let h = 0; h < 24; h++) {
+    for (let m = 0; m < 60; m += 30) {
+      const hour = h % 12 === 0 ? 12 : h % 12;
+      const minute = m === 0 ? "00" : "30";
+      const ampm = h < 12 ? "am" : "pm";
+      times.push(`${hour}:${minute} ${ampm}`);
+    }
   }
-];
+  return times;
+}
+const timeOptions = generateTimeOptions();
 
-// Mock bookings
-const mockPastBookings = [
-  { ...mockCustomers[1], status: 'Completed', bookingDate: '2025-09-25' },
-  { ...mockCustomers[2], status: 'Completed', bookingDate: '2025-09-20' },
-];
-
-// Mock provider profile
 const initialProvider = {
   name: 'Provider Name',
   email: 'provider@email.com',
   phone: '',
-  description: '123 Main St, Springfield. Open Mon-Sat 9am-6pm. Call us for emergency repairs, installations, and maintenance. We have 20+ years experience and certified professionals.',
+  availability: { from: "9:00 am", to: "4:00 pm" },
+  description: '',
   rating: 4.6,
   reviews: [
     { user: 'Alice', stars: 5, text: 'Great work, very professional!' },
@@ -62,126 +34,89 @@ const initialProvider = {
   ]
 };
 
-const bookingStatusOptions = ['Pending', 'In Progress', 'Completed'];
-
 const ProviderDashboard = () => {
-  // Location state
-  const [location, setLocation] = useState(null);
-
-  // Sidebar navigation
-  const [activePage, setActivePage] = useState('home');
-  const [requests, setRequests] = useState(mockCustomers);
-  const [acceptedRequest, setAcceptedRequest] = useState(null);
-  const [currentBookingStatus, setCurrentBookingStatus] = useState('Pending');
+  const [activePage, setActivePage] = useState('profile');
   const [provider, setProvider] = useState(initialProvider);
+
+  // Profile details editing
+  const [isEditing, setIsEditing] = useState(false);
   const [phoneInput, setPhoneInput] = useState(provider.phone);
+  const [availabilityFrom, setAvailabilityFrom] = useState(provider.availability.from);
+  const [availabilityTo, setAvailabilityTo] = useState(provider.availability.to);
   const [descriptionInput, setDescriptionInput] = useState(provider.description);
 
-  // Location request on mount
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          });
-        },
-        (error) => {
-          console.error("Error getting location:", error);
-        }
-      );
-    }
-  }, []);
+  // Service price section states
+  const [selectedCategory, setSelectedCategory] = useState(categories[0]);
+  const [otherCategory, setOtherCategory] = useState('');
+  const [services, setServices] = useState([]);
+  const [showAddService, setShowAddService] = useState(false);
+  const [addServiceName, setAddServiceName] = useState('');
+  const [addServicePrice, setAddServicePrice] = useState('');
+  const [editServiceIdx, setEditServiceIdx] = useState(null);
 
-  // Accept request
-  const handleAcceptRequest = (customer) => {
-    setAcceptedRequest({
-      ...customer,
-      status: currentBookingStatus,
-      bookingDate: '2025-10-06'
-    });
-    setRequests(requests.filter(req => req.id !== customer.id));
-    setActivePage('home');
+  // Only allow digits, max 10
+  const handlePhoneInputChange = (e) => {
+    if (!isEditing) return;
+    const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+    setPhoneInput(val);
   };
 
-  // Change status in bookings
-  const handleBookingStatusChange = (newStatus) => {
-    setCurrentBookingStatus(newStatus);
-    setAcceptedRequest(prev => prev ? { ...prev, status: newStatus } : null);
-  };
-
-  // Save phone/description in profile
+  // Save Profile Details
   const handleProfileSave = () => {
     setProvider(prev => ({
       ...prev,
       phone: phoneInput,
+      availability: { from: availabilityFrom, to: availabilityTo },
       description: descriptionInput
     }));
+    setIsEditing(false);
     alert('Profile updated!');
   };
 
-  // Logout
-  const handleLogout = () => {
-    window.location.href = '/login';
+  // Service modal open/close handlers
+  const openAddService = (idx = null) => {
+    if (idx !== null) {
+      setEditServiceIdx(idx);
+      setAddServiceName(services[idx].name);
+      setAddServicePrice(services[idx].price.toString());
+    } else {
+      setEditServiceIdx(null);
+      setAddServiceName('');
+      setAddServicePrice('');
+    }
+    setShowAddService(true);
+  };
+  const closeAddService = () => {
+    setShowAddService(false);
+    setAddServiceName('');
+    setAddServicePrice('');
+    setEditServiceIdx(null);
   };
 
-  // Card for customer request (Home and Past Bookings Small Card)
-  const CustomerSmallCard = ({ customer, showAccept, acceptedStatus }) => (
-    <div className={`provider-customer-card small-card ${acceptedStatus ? 'accepted-card' : ''}`}>
-      <div className="card-profile">
-        <FaUserCircle size={38} />
-      </div>
-      <div className="card-info">
-        <div className="card-info-item"><strong>Name:</strong> {customer.name}</div>
-        <div className="card-info-item"><strong>Email:</strong> {customer.email}</div>
-        <div className="card-info-item"><strong>Phone:</strong> {customer.phone}</div>
-        <div className="card-info-item"><strong>Category:</strong> {customer.category}</div>
-        {customer.bookingDate && (
-          <div className="card-info-item"><FaCalendarAlt /> {customer.bookingDate}</div>
-        )}
-        {acceptedStatus && (
-          <div className="card-info-item accepted-status">
-            Status:
-            <span className={`accepted-status-label status-${customer.status.toLowerCase().replace(/ /g, '-')}`}>{customer.status}</span>
-          </div>
-        )}
-        {showAccept && (
-          <div className="accept-btn-row">
-            <button className="accept-request-btn" onClick={() => handleAcceptRequest(customer)}>Accept Request</button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+  const handleAddServiceSubmit = (e) => {
+    e.preventDefault();
+    if (!addServiceName || !addServicePrice || isNaN(Number(addServicePrice))) return;
+    let newService = { name: addServiceName, price: Number(addServicePrice) };
+    if (editServiceIdx !== null) {
+      setServices(services.map((srv, idx) => idx === editServiceIdx ? newService : srv));
+    } else {
+      setServices([...services, newService]);
+    }
+    closeAddService();
+  };
 
-  // Card for accepted/current booking (Wide Card)
-  const CustomerWideCard = ({ customer, acceptedStatus }) => (
-    <div className={`provider-customer-card wide-card ${acceptedStatus ? 'accepted-card' : ''}`}>
-      <div className="card-profile">
-        <FaUserCircle size={56} />
-      </div>
-      <div className="card-info">
-        <div className="card-info-item"><strong>Name:</strong> {customer.name}</div>
-        <div className="card-info-item"><strong>Email:</strong> {customer.email}</div>
-        <div className="card-info-item"><strong>Phone:</strong> {customer.phone}</div>
-        <div className="card-info-item"><strong>Category:</strong> {customer.category}</div>
-        {customer.bookingDate && (
-          <div className="card-info-item"><FaCalendarAlt /> {customer.bookingDate}</div>
-        )}
-        {acceptedStatus && (
-          <div className="card-info-item accepted-status">
-            Status:
-            <span className={`accepted-status-label status-${customer.status.toLowerCase().replace(/ /g, '-')}`}>{customer.status}</span>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+  const handleDeleteService = (idx) => {
+    setServices(services.filter((_, i) => i !== idx));
+  };
+
+  // Edit Button
+  const handleEditProfile = () => {
+    setIsEditing(true);
+  };
 
   return (
     <div className="provider-dashboard-root">
-      {/* Side Panel */}
+      {/* Sidebar */}
       <div className="sidebar">
         <div className="sidebar-title">FixItNow</div>
         <div className="sidebar-subtitle">Provider</div>
@@ -197,117 +132,189 @@ const ProviderDashboard = () => {
           </button>
         </nav>
         <div className="sidebar-bottom">
-          <button className="logout-button" onClick={handleLogout}>
+          <button className="logout-button" onClick={() => window.location.href = '/login'}>
             <FaSignOutAlt /> Logout
           </button>
         </div>
       </div>
-
       {/* Main Content */}
       <div className="dashboard-main">
-        {/* Home */}
-        {activePage === 'home' && (
-          <div>
-            <div className="dashboard-header">
-              <h1 className="dashboard-header-bold-white">Customers Near You</h1>
-              {location && (
-                <p>
-                  <FaMapMarkerAlt /> Your location: {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
-                </p>
-              )}
-            </div>
-            {acceptedRequest && (
-              <div>
-                <CustomerWideCard customer={acceptedRequest} acceptedStatus />
-              </div>
-            )}
-            <div style={{ marginTop: acceptedRequest ? '2.2rem' : 0 }}>
-              <h2 className="dashboard-header-bold-white" style={{ fontSize: '1.25rem', marginBottom: '1rem' }}>Customer Requests</h2>
-              <div className="providers-grid">
-                {requests.slice(0, 5).map(customer => (
-                  <CustomerSmallCard key={customer.id} customer={customer} showAccept />
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Bookings */}
-        {activePage === 'bookings' && (
-          <div className="bookings-page">
-            <h2 className="dashboard-header-bold-white">Current Bookings</h2>
-            <div className="providers-grid">
-              {acceptedRequest && (
-                <div className="provider-customer-card wide-card accepted-card">
-                  <div className="card-profile">
-                    <FaUserCircle size={56} />
-                  </div>
-                  <div className="card-info">
-                    <div className="card-info-item"><strong>Name:</strong> {acceptedRequest.name}</div>
-                    <div className="card-info-item"><strong>Email:</strong> {acceptedRequest.email}</div>
-                    <div className="card-info-item"><strong>Phone:</strong> {acceptedRequest.phone}</div>
-                    <div className="card-info-item"><strong>Category:</strong> {acceptedRequest.category}</div>
-                    <div className="card-info-item"><FaCalendarAlt /> {acceptedRequest.bookingDate}</div>
-                  </div>
-                  <div className="booking-status-dropdown">
-                    <label htmlFor="booking-status-select"><strong>Status:</strong></label>
-                    <select
-                      id="booking-status-select"
-                      value={currentBookingStatus}
-                      onChange={e => handleBookingStatusChange(e.target.value)}
-                    >
-                      {bookingStatusOptions.map(opt => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              )}
-            </div>
-            <h2 className="dashboard-header-bold-white">Past Bookings</h2>
-            <div className="providers-grid">
-              {mockPastBookings.map(customer => (
-                <CustomerSmallCard key={customer.id} customer={customer} />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Profile */}
         {activePage === 'profile' && (
           <div className="profile-page">
-            {/* Section 1: Profile Info */}
+            {/* Section 1: Profile Details */}
             <div className="profile-info-box wide-profile-box">
-              <div className="profile-info-left">
-                <FaUserCircle size={90} />
-              </div>
               <div className="profile-info-right">
+                <h2 className="profile-reviews-heading" style={{fontSize: '1.33rem', marginBottom: '0.7rem'}}>Profile Details</h2>
                 <div className="profile-info-item"><strong>Name:</strong> {provider.name}</div>
                 <div className="profile-info-item"><strong>Email:</strong> {provider.email}</div>
+                {/* Phone */}
                 <div className="profile-info-item phone-box-wide">
                   <label htmlFor="phone"><strong>Phone Number:</strong></label>
                   <input
                     id="phone"
                     type="tel"
+                    disabled={!isEditing}
                     placeholder="Add phone number"
                     value={phoneInput}
-                    onChange={e => setPhoneInput(e.target.value)}
+                    onChange={handlePhoneInputChange}
                   />
+                  {phoneInput.length !== 10 && isEditing && (
+                    <span style={{ color: 'red', fontSize: '0.96rem', marginLeft: '0.6rem' }}>Phone number must be 10 digits</span>
+                  )}
                 </div>
+                {/* Availability */}
+                <div className="profile-info-item phone-box-wide">
+                  <label><strong>Availability:</strong></label>
+                  <select
+                    value={availabilityFrom}
+                    disabled={!isEditing}
+                    onChange={e => setAvailabilityFrom(e.target.value)}
+                    style={{marginLeft:'0.3rem'}}
+                  >
+                    {timeOptions.map(opt => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                  <span style={{margin: "0 0.5rem"}}>to</span>
+                  <select
+                    value={availabilityTo}
+                    disabled={!isEditing}
+                    onChange={e => setAvailabilityTo(e.target.value)}
+                  >
+                    {timeOptions.map(opt => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
+                {/* Description */}
                 <div className="profile-info-item description-box">
                   <label htmlFor="description"><strong>Description:</strong></label>
                   <textarea
                     id="description"
                     rows={3}
+                    disabled={!isEditing}
                     placeholder="Add provider shop details"
                     value={descriptionInput}
                     onChange={e => setDescriptionInput(e.target.value)}
                   />
                 </div>
-                <button className="save-phone-button" style={{marginTop:'1rem'}} onClick={handleProfileSave}>Save</button>
+                {/* Edit & Save Buttons */}
+                <div style={{display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem'}}>
+                  <button className="accept-request-btn" style={{background: '#6b46c1'}} onClick={handleEditProfile} disabled={isEditing}>Edit</button>
+                  <button
+                    className="save-phone-button"
+                    style={{background:'#2b6cb0'}}
+                    onClick={handleProfileSave}
+                    disabled={!isEditing || phoneInput.length !== 10}
+                  >
+                    Save
+                  </button>
+                </div>
               </div>
             </div>
-            {/* Section 2: Reviews and actions */}
+            {/* Section 2: Service Price Box */}
+            <div className="profile-info-box wide-profile-box" style={{marginBottom: '0.5rem', position: 'relative', minHeight: '180px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start'}}>
+              <h2 className="profile-reviews-heading" style={{fontSize: '1.33rem', marginBottom: '0.7rem'}}>Service Details</h2>
+              <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: '1.2rem'}}>
+                <div style={{display: 'flex', alignItems: 'center', gap: '0.7rem'}}>
+                  <label htmlFor="category" style={{fontWeight: 'bold'}}>Category:</label>
+                  <select id="category" value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)}>
+                    {categories.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                  {selectedCategory === 'Others' && (
+                    <input
+                      type="text"
+                      placeholder="Mention your service"
+                      value={otherCategory}
+                      onChange={e => setOtherCategory(e.target.value)}
+                      style={{marginLeft: '0.7rem', padding: '0.5rem', borderRadius: '0.5rem', border: '2px solid #e2e8f0'}}
+                    />
+                  )}
+                </div>
+                <button
+                  className="accept-request-btn"
+                  style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}
+                  onClick={() => openAddService()}
+                >
+                  <FaPlus /> Add services
+                </button>
+              </div>
+              {/* List of services */}
+              <div style={{marginTop: '0.7rem', width: '100%', flex: 1, display: 'flex', alignItems: services.length === 0 ? 'center' : 'flex-start', justifyContent: services.length === 0 ? 'center' : 'flex-start'}}>
+                {services.length === 0 ? (
+                  <div style={{color: '#a0aec0', fontSize: '1.13rem', textAlign: 'center', width: '100%'}}>No services added yet.</div>
+                ) : (
+                  <table style={{width: '100%', borderCollapse: 'collapse'}}>
+                    <thead>
+                      <tr style={{background: '#faf5ff'}}>
+                        <th style={{textAlign: 'left', padding: '0.6rem'}}>Service</th>
+                        <th style={{textAlign: 'right', padding: '0.6rem'}}>Price (₹)</th>
+                        <th style={{textAlign: 'center', padding: '0.6rem'}}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {services.map((srv, idx) => (
+                        <tr key={idx} style={{borderBottom: '1px solid #e2e8f0'}}>
+                          <td style={{padding: '0.6rem'}}>{srv.name}</td>
+                          <td style={{padding: '0.6rem', textAlign: 'right'}}>{srv.price}</td>
+                          <td style={{padding: '0.6rem', textAlign: 'center'}}>
+                            <button style={{marginRight: '0.5rem'}} onClick={() => openAddService(idx)} title="Edit"><FaEdit /></button>
+                            <button onClick={() => handleDeleteService(idx)} title="Delete"><FaTrash /></button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+            {/* Add/Edit Service Modal */}
+            {showAddService && (
+              <div style={{
+                position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+                background: 'rgba(0,0,0,0.17)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999
+              }}>
+                <form
+                  onSubmit={handleAddServiceSubmit}
+                  style={{
+                    background: '#fff', borderRadius: '1rem', boxShadow: '0 4px 28px rgba(80,36,143,0.15)',
+                    padding: '2.2rem 2.8rem', minWidth: '320px', maxWidth: '96vw'
+                  }}
+                >
+                  <h3 style={{marginBottom: '1rem'}}>{editServiceIdx !== null ? 'Edit service' : 'Add service'}</h3>
+                  <div style={{marginBottom: '1rem'}}>
+                    <label style={{fontWeight: 'bold'}}>Service name:</label>
+                    <input
+                      type="text"
+                      value={addServiceName}
+                      onChange={e => setAddServiceName(e.target.value)}
+                      required
+                      style={{marginLeft: '0.7rem', padding: '0.6rem', borderRadius: '0.5rem', border: '2px solid #e2e8f0', width: '80%'}}
+                      placeholder="Enter service name"
+                    />
+                  </div>
+                  <div style={{marginBottom: '1.5rem'}}>
+                    <label style={{fontWeight: 'bold'}}>Price (₹):</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={addServicePrice}
+                      onChange={e => setAddServicePrice(e.target.value)}
+                      required
+                      style={{marginLeft: '0.7rem', padding: '0.6rem', borderRadius: '0.5rem', border: '2px solid #e2e8f0', width: '60%'}}
+                      placeholder="Enter price"
+                    />
+                  </div>
+                  <div style={{display: 'flex', justifyContent: 'flex-end', gap: '0.7rem'}}>
+                    <button type="button" className="accept-request-btn" style={{background:'#6b46c1'}} onClick={closeAddService}>Cancel</button>
+                    <button type="submit" className="accept-request-btn" style={{background:'#2b6cb0'}}>{editServiceIdx !== null ? 'Update' : 'Add'}</button>
+                  </div>
+                </form>
+              </div>
+            )}
+            {/* Section 3: Reviews and actions */}
             <div className="profile-actions-box wide-profile-box">
               <h2 className="profile-reviews-heading">Reviews & Ratings</h2>
               <div className="profile-rating-row">

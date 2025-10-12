@@ -24,6 +24,9 @@ public class Users {
 
     @Column(name = "password", nullable = false)
     private String password;
+    
+    @Column(name = "phno", length = 10)
+    private String phno;
 
     @Column(name = "location")
     private String location; // Store location data from frontend
@@ -68,6 +71,14 @@ public class Users {
     }
     public void setPassword(String password) {
         this.password = password;
+    }
+    
+    public String getPhno() {
+        return phno;
+    }
+
+    public void setPhno(String phno) {
+        this.phno = phno;
     }
 
     public String getLocation() {
