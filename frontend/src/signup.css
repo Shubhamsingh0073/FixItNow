@@ -1,0 +1,131 @@
+.login-container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(to right, #8E2DE2, #4A00E0);
+    padding: 2rem;
+}
+
+.login-card {
+    background: white;
+    border-radius: 1rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 400px;
+    overflow: hidden;
+}
+
+.brand-section {
+    text-align: center;
+    padding: 2rem 1rem;
+}
+
+.logo {
+    width: 4rem;
+    height: 4rem;
+    background: linear-gradient(to right, #8E2DE2, #4A00E0);
+    border-radius: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1rem;
+}
+
+.logo span {
+    color: white;
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+
+.brand-section h1 {
+    font-size: 1.5rem;
+    color: #1a1a1a;
+    margin-bottom: 0.5rem;
+}
+
+.brand-section p {
+    color: #666;
+    font-size: 0.9rem;
+}
+
+form {
+    padding: 1.5rem;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+    position: relative;
+}
+
+input {
+    width: 100%;
+    padding: 0.75rem 1rem 0.75rem 2.5rem;
+    border: 1px solid #e1e1e1;
+    border-radius: 0.5rem;
+    font-size: 0.9rem;
+    transition: all 0.3s;
+}
+
+input:focus {
+    border-color: #8E2DE2;
+    box-shadow: 0 0 0 2px rgba(142, 45, 226, 0.1);
+    outline: none;
+}
+
+.error-message {
+    color: #dc3545;
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+}
+
+button[type="submit"] {
+    width: 100%;
+    padding: 0.75rem;
+    background: linear-gradient(to right, #8E2DE2, #4A00E0);
+    color: white;
+    border: none;
+    border-radius: 0.5rem;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+button[type="submit"]:hover {
+    opacity: 0.9;
+}
+
+button[type="submit"]:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.role-selector {
+    margin-bottom: 1rem;
+}
+
+.role-selector label {
+    display: inline-flex;
+    align-items: center;
+    margin-right: 1rem;
+    cursor: pointer;
+}
+
+.role-selector input[type="radio"] {
+    width: auto;
+    margin-right: 0.5rem;
+}
+
+/* SVG Icons styles */
+.form-group svg {
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #666;
+    font-size: 1rem;
+}
+
+input:focus + svg {
+    color: #8E2DE2;
+}

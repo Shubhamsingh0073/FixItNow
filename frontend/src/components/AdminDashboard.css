@@ -1,0 +1,324 @@
+.dashboard {
+    display: flex;
+    height: 100vh;
+    font-family: Arial, sans-serif;
+}
+
+/* Theme */
+.admin-theme {
+    background: linear-gradient(-45deg, #6b46c1, #805ad5, #4834d4, #2b6cb0);
+    background-size: 400% 400%;
+    animation: gradientBG 15s ease infinite;
+}
+
+@keyframes gradientBG {
+    0% {
+        background-position: 0% 50%;
+    }
+
+    50% {
+        background-position: 100% 50%;
+    }
+
+    100% {
+        background-position: 0% 50%;
+    }
+}
+
+/* Sidebar */
+.sidebar {
+    width: 250px;
+    background: rgba(255, 255, 255, 0.97);
+    color: #6b46c1;
+    padding: 28px 18px 18px 18px;
+    box-shadow: 2px 0 18px rgba(80, 36, 143, 0.09);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 250px;
+}
+
+.logo {
+    font-size: 2.1rem;
+    font-weight: bold;
+    color: #6b46c1;
+    margin-bottom: 0.2rem;
+    letter-spacing: 1px;
+}
+
+.sidebar-subtitle {
+    font-size: 1.12rem;
+    color: #4a5568;
+    font-weight: 600;
+    margin-bottom: 1.7rem;
+    letter-spacing: 1px;
+}
+
+.sidebar ul {
+    list-style: none;
+    padding: 0;
+    width: 100%;
+    margin-bottom: auto;
+}
+
+.sidebar li {
+    margin: 17px 0;
+    cursor: pointer;
+    font-size: 1.09rem;
+    color: #4a5568;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 16px;
+    border-radius: 0.7rem;
+    font-weight: 600;
+    transition: background 0.16s, color 0.16s;
+}
+
+.sidebar li.active,
+.sidebar li:hover {
+    background: linear-gradient(135deg, #6b46c1, #2b6cb0);
+    color: #fff;
+}
+
+.sidebar-heading {
+    cursor: default !important;
+    background: none !important;
+    color: #2b6cb0 !important;
+    font-weight: bold !important;
+    pointer-events: none;
+}
+
+.sidebar-bottom {
+    width: 100%;
+    margin-top: 2rem;
+    display: flex;
+    justify-content: center;
+}
+
+.logout-button {
+    width: 100%;
+    padding: 0.8rem 1rem;
+    background: #e53e3e;
+    color: white;
+    border: none;
+    border-radius: 0.8rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.8rem;
+    cursor: pointer;
+    transition: background 0.3s, transform 0.3s;
+    font-size: 1.05rem;
+}
+
+.logout-button:hover {
+    background: #c53030;
+    transform: translateY(-2px);
+}
+
+/* Main content */
+.main {
+    flex: 1;
+    padding: 32px 30px;
+    background: rgba(255, 255, 255, 0.93);
+    overflow-y: auto;
+}
+
+.stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 18px;
+    margin-bottom: 32px;
+}
+
+.card {
+    background: white;
+    padding: 26px 0;
+    font-size: 2.2rem;
+    font-weight: bold;
+    text-align: center;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(107, 70, 193, 0.12);
+    color: #6b46c1;
+}
+
+.card span {
+    display: block;
+    font-size: 1.07rem;
+    font-weight: normal;
+    color: #2b6cb0;
+    margin-top: 5px;
+}
+
+/* Tables */
+.tables {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 28px;
+}
+
+.table {
+    background: white;
+    padding: 18px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(107, 70, 193, 0.12);
+}
+
+.table h3 {
+    margin-bottom: 14px;
+    font-size: 1.2rem;
+    color: #6b46c1;
+}
+
+.table table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.table th,
+.table td {
+    text-align: left;
+    padding: 10px;
+    border-bottom: 1px solid #e2e8f0;
+    font-size: 1.07rem;
+}
+
+.wide-table {
+    width: 100%;
+    margin-top: 18px;
+}
+
+/* Table header for manage buttons */
+.table-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.manage-btn {
+    background: linear-gradient(135deg, #6b46c1, #2b6cb0);
+    color: #fff;
+    border: none;
+    border-radius: 7px;
+    font-weight: 600;
+    padding: 10px 20px;
+    cursor: pointer;
+    font-size: 1.05rem;
+}
+
+.manage-btn:hover {
+    background: #805ad5;
+}
+
+/* Delete button */
+.delete-btn {
+    background: #e53e3e;
+    color: white;
+    border: none;
+    border-radius: 7px;
+    font-weight: 600;
+    padding: 7px 14px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background 0.2s;
+}
+
+.delete-btn:hover {
+    background: #c53030;
+}
+
+/* Status labels */
+.status {
+    padding: 5px 12px;
+    border-radius: 13px;
+    font-size: 13px;
+    color: white;
+    font-weight: 600;
+}
+
+.status.completed {
+    background: #16a34a;
+}
+
+.status.inprogress {
+    background: #2563eb;
+}
+
+.status.pending {
+    background: #f59e0b;
+}
+
+.status.active {
+    background: #38a169;
+}
+
+.status.inactive {
+    background: #f59e0b;
+}
+
+/* Complaints */
+.complaints-list {
+    display: flex;
+    flex-direction: column;
+    gap: 26px;
+}
+
+.complaint-card {
+    background: white;
+    border-radius: 13px;
+    box-shadow: 0 2px 10px rgba(107, 70, 193, 0.13);
+    padding: 28px 28px 20px 28px;
+    width: 100%;
+    max-width: 1100px;
+    margin: 0 auto;
+}
+
+.complaint-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 9px;
+    font-size: 1.13rem;
+    color: #6b46c1;
+}
+
+.complaint-date {
+    font-size: 0.98rem;
+    color: #4a5568;
+}
+
+.complaint-body {
+    font-size: 1.08rem;
+    color: #2d3748;
+    margin-left: 2px;
+}
+
+@media (max-width: 900px) {
+    .main {
+        padding: 12px 2px;
+    }
+
+    .sidebar {
+        min-width: 170px;
+        padding: 16px 4px 4px 4px;
+    }
+
+    .wide-table,
+    .complaint-card {
+        max-width: 96vw;
+        padding: 18px 8px;
+    }
+
+    .stats {
+        grid-template-columns: 1fr 1fr;
+        font-size: 1.1rem;
+    }
+
+    .tables {
+        grid-template-columns: 1fr;
+        gap: 14px;
+    }
+}

@@ -1,0 +1,75 @@
+# Gitignore for FixItNow
+# Project contains a Java (Maven) backend and a Node/React frontend.
+
+# ------------------------
+# Node / Frontend
+# ------------------------
+# dependencies
+/frontend/node_modules/
+/frontend/.pnp/
+/frontend/.pnp.js
+
+# build / production
+/frontend/build/
+
+# testing
+/frontend/coverage/
+
+# logs
+/frontend/npm-debug.log*
+/frontend/yarn-debug.log*
+/frontend/yarn-error.log*
+
+# envs
+/frontend/.env
+/frontend/.env.local
+/frontend/.env.development.local
+/frontend/.env.test.local
+/frontend/.env.production.local
+
+# local misc
+/frontend/.DS_Store
+
+# ------------------------
+# Java / Maven backend
+# ------------------------
+# Maven build output
+/backend/target/
+
+# wrapper jar
+/backend/.mvn/wrapper/maven-wrapper.jar
+
+# Exclude generated target/build inside module source trees (keep if present)
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# Local docs or helpers that shouldn't be committed
+/backend/HELP.md
+
+# ------------------------
+# Editors and IDEs
+# ------------------------
+# STS
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+# IntelliJ
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# NetBeans
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+# VS Code
+.vscode/
