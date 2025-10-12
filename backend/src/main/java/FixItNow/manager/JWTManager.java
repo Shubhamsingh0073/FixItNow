@@ -1,4 +1,4 @@
-package FixItNow.model;
+package FixItNow.manager;
 
 import java.util.HashMap;
 import java.util.*;

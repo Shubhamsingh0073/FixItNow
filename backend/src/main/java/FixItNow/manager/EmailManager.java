@@ -1,4 +1,4 @@
-package FixItNow.model;
+package FixItNow.manager;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mail.SimpleMailMessage;

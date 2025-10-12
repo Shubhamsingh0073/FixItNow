@@ -17,9 +17,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import FixItNow.manager.UsersManager;
 import FixItNow.model.UserRole;
 import FixItNow.model.Users;
-import FixItNow.model.UsersManager;
 import FixItNow.repository.UsersRepository;
 
 @CrossOrigin(origins = "*")
@@ -31,6 +31,9 @@ public class UsersController {
 
     @Autowired
     private UsersRepository userRepository;
+    
+    @Autowired
+    private UsersManager usersManager;
 
     @PostMapping("/signin")
     public ResponseEntity<?> loginUser(@RequestBody Map<String, String> loginData) {
@@ -48,16 +51,16 @@ public class UsersController {
         }
 
         // Find user by email
-        Users user = userRepository.findByEmail(email);
+        String result = usersManager.validateCredentials(email, password);
 
         // Check for user, password and role match
-        if (user != null && user.getPassword().equals(password) && user.getRole() == role) {
+        if (result.startsWith("200::")) {
             Map<String, String> response = new HashMap<>();
-            response.put("token", "dummy-jwt-token");
+            response.put("token", result.substring(5));
             return ResponseEntity.ok(response);
         } else {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                                 .body(Collections.singletonMap("message", "Invalid email, password, or role"));
+                    .body(Collections.singletonMap("message", "Invalid email, password, or role"));
         }
     }
     
@@ -77,22 +80,23 @@ public class UsersController {
                     .body(Collections.singletonMap("message", "Invalid role"));
         }
 
-        // Check if user already exists
-        if (userRepository.findByEmail(email) != null) {
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(Collections.singletonMap("message", "Email already registered"));
-        }
 
         // Create new user
         Users newUser = new Users();
-        newUser.setName(name); // Make sure your Users entity has setname or setName method
+        newUser.setName(name);
         newUser.setEmail(email);
-        newUser.setPassword(password); // In production, hash the password!
+        newUser.setPassword(password);
         newUser.setRole(role);
 
-        userRepository.save(newUser);
+        String result = usersManager.AddUsers(newUser);
 
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(Collections.singletonMap("message", "User registered successfully"));
+        // Check if user already exists
+        if (result.startsWith("401::")) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Collections.singletonMap("message", "Email already registered"));
+        } else {
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .body(Collections.singletonMap("message", "User registered successfully"));
+        }
     }
 }
