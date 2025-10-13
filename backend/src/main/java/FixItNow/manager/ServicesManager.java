@@ -4,11 +4,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import FixItNow.model.Services;
 import FixItNow.model.Users;
 import FixItNow.repository.ServicesRepository;
 
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
 
 @Service
 public class ServicesManager {
@@ -40,5 +44,25 @@ public class ServicesManager {
         service.setPrice(new BigDecimal("0.00"));
         service.setAvailability("{\"Monday\": \"9-5\"}");
         return sr.save(service);
+    }
+    
+    public void updateServiceDetails(Users provider, Map<String, Object> data) {
+        List<Services> servicesList = sr.findByProvider(provider);
+        if (servicesList != null && !servicesList.isEmpty()) {
+            ObjectMapper mapper = new ObjectMapper();
+            String availabilityJson = "";
+            try {
+                availabilityJson = mapper.writeValueAsString(data.get("availability"));
+            } catch (JsonProcessingException e) {
+                // Handle error, e.g. log and/or set a default value
+                availabilityJson = "{}";
+                e.printStackTrace();
+            }
+            for (Services service : servicesList) {
+                service.setAvailability(availabilityJson);
+                service.setDescription((String) data.get("description"));
+                sr.save(service);
+            }
+        }
     }
 }

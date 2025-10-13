@@ -4,41 +4,11 @@ import './ProviderDashboard.css';
 
 // Mock data for customers
 const mockCustomers = [
-  {
-    id: 1,
-    name: 'Alice Johnson',
-    phone: '+1234567890',
-    email: 'alice@email.com',
-    category: 'Plumbing'
-  },
-  {
-    id: 2,
-    name: 'Bob Smith',
-    phone: '+1987654321',
-    email: 'bob@email.com',
-    category: 'Electrical'
-  },
-  {
-    id: 3,
-    name: 'Carol Lee',
-    phone: '+1472583690',
-    email: 'carol@email.com',
-    category: 'Carpentry'
-  },
-  {
-    id: 4,
-    name: 'David King',
-    phone: '+1357924680',
-    email: 'david@email.com',
-    category: 'Cleaning'
-  },
-  {
-    id: 5,
-    name: 'Emma Brown',
-    phone: '+1122334455',
-    email: 'emma@email.com',
-    category: 'Appliance Repair'
-  }
+  { id: 1, name: 'Alice Johnson', phone: '+1234567890', email: 'alice@email.com', category: 'Plumbing' },
+  { id: 2, name: 'Bob Smith', phone: '+1987654321', email: 'bob@email.com', category: 'Electrical' },
+  { id: 3, name: 'Carol Lee', phone: '+1472583690', email: 'carol@email.com', category: 'Carpentry' },
+  { id: 4, name: 'David King', phone: '+1357924680', email: 'david@email.com', category: 'Cleaning' },
+  { id: 5, name: 'Emma Brown', phone: '+1122334455', email: 'emma@email.com', category: 'Appliance Repair' }
 ];
 
 // Mock bookings
@@ -49,11 +19,6 @@ const mockPastBookings = [
 
 // Mock provider profile
 const initialProvider = {
-  name: 'Provider Name',
-  email: 'provider@email.com',
-  phone: '',
-  availability: { from: "9:00 am", to: "4:00 pm" },
-  description: '',
   rating: 4.6,
   reviews: [
     { user: 'Alice', stars: 5, text: 'Great work, very professional!' },
@@ -89,6 +54,8 @@ const ProviderDashboard = () => {
   const [latLng, setLatLng] = useState(null);
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
 
+  const [userData, setUserData] = useState({ name: '', email: '' });
+
   // Sidebar navigation
   const [activePage, setActivePage] = useState('home');
   const [requests, setRequests] = useState(mockCustomers);
@@ -96,10 +63,10 @@ const ProviderDashboard = () => {
   const [currentBookingStatus, setCurrentBookingStatus] = useState('Pending');
   const [provider, setProvider] = useState(initialProvider);
   const [isEditing, setIsEditing] = useState(false);
-  const [phoneInput, setPhoneInput] = useState(provider.phone);
-  const [availabilityFrom, setAvailabilityFrom] = useState(provider.availability.from);
-  const [availabilityTo, setAvailabilityTo] = useState(provider.availability.to);
-  const [descriptionInput, setDescriptionInput] = useState(provider.description);
+  const [phoneInput, setPhoneInput] = useState('');
+  const [availabilityFrom, setAvailabilityFrom] = useState('');
+  const [availabilityTo, setAvailabilityTo] = useState('');
+  const [descriptionInput, setDescriptionInput] = useState('');
 
   // Service price section states
   const [selectedCategory, setSelectedCategory] = useState(categories[0]);
@@ -109,6 +76,126 @@ const ProviderDashboard = () => {
   const [addServiceName, setAddServiceName] = useState('');
   const [addServicePrice, setAddServicePrice] = useState('');
   const [editServiceIdx, setEditServiceIdx] = useState(null);
+
+  const savePhoneToBackend = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      alert('No token found. Please login.');
+      return;
+    }
+    try {
+      const response = await fetch('http://localhost:8087/users/me/phone', {
+        method: 'PUT', // or 'POST' if your backend expects it
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ phone: phoneInput }),
+      });
+      if (!response.ok) throw new Error('Failed to save phone');
+      //alert('Phone updated!');
+    } catch (error) {
+      alert('Phone update failed: ' + error.message);
+    }
+  };
+
+
+  const saveAvailabilityDescriptionToBackend = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      alert('No token found. Please login.');
+      return;
+    }
+    try {
+      const response = await fetch('http://localhost:8087/service/me', {
+        method: 'PUT', // or 'POST' if your backend expects it
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          availability: { from: availabilityFrom, to: availabilityTo },
+          description: descriptionInput,
+        }),
+      });
+      if (!response.ok) throw new Error('Failed to save availability/description');
+      //alert('Availability and description updated!');
+    } catch (error) {
+      alert('Availability/description update failed: ' + error.message);
+    }
+  };
+  
+  //save location to backend
+  const saveLocationToBackend = async (locationText) => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      alert('No token found. Please login.');
+      return;
+    }
+    try {
+      const response = await fetch('http://localhost:8087/users/me/location', {
+        method: 'PUT', // or POST if your backend expects it
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ location: locationText }),
+      });
+      if (!response.ok) throw new Error('Failed to save location');
+      // optionally show a success message here
+    } catch (error) {
+      alert('Location update failed: ' + error.message);
+    }
+  };
+
+
+  // Get user data from localStorage
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      console.error("No JWT found in localStorage. Please login.");
+      return;
+    }
+
+    fetch('http://localhost:8087/users/me', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    })
+      .then(res => {
+        if (!res.ok) throw new Error("Network response was not ok");
+        return res.json();
+      })
+      .then(data => {
+        // Backend should return { name, email, phone }
+        setUserData({ name: data.name, email: data.email, phone: data.phone });
+        setPhoneInput(data.phone || ''); // If you use a separate state for phone input
+      })
+      .catch(err => {
+        console.error('Error fetching user:', err);
+      });
+    
+    // Fetch availability and description
+    fetch('http://localhost:8087/service/me', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      }
+    })
+      .then(res => res.ok ? res.json() : Promise.reject('Failed to fetch service'))
+      .then(data => {
+        if (data.availability) {
+          setAvailabilityFrom(data.availability.from);
+          setAvailabilityTo(data.availability.to);
+        }
+        if (data.description) setDescriptionInput(data.description);
+      })
+      .catch(err => console.error('Service fetch error:', err));
+  }, []);
+  
 
   // Get geolocation and address using OpenStreetMap Nominatim
   useEffect(() => {
@@ -124,13 +211,22 @@ const ProviderDashboard = () => {
           fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
             .then(response => response.json())
             .then(data => {
-              setLocation(data.display_name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`);
-              setLocationInput(data.display_name || '');
+              const locationText = data.display_name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+              setLocation(locationText);
+              setLocationInput(locationText);
               setIsLoadingLocation(false);
+
+              // Save location to backend
+              saveLocationToBackend(locationText);
             })
             .catch(err => {
-              setLocation(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+              const locationText = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+              setLocation(locationText);
+              setLocationInput(locationText);
               setIsLoadingLocation(false);
+
+              // Save fallback location to backend
+              saveLocationToBackend(locationText);
             });
         },
         (error) => {
@@ -171,7 +267,7 @@ const ProviderDashboard = () => {
   };
 
   // Save Profile Details
-  const handleProfileSave = () => {
+  const handleProfileSave = async () => {
     setProvider(prev => ({
       ...prev,
       phone: phoneInput,
@@ -179,6 +275,8 @@ const ProviderDashboard = () => {
       description: descriptionInput
     }));
     setIsEditing(false);
+    await savePhoneToBackend();
+    await saveAvailabilityDescriptionToBackend();
     alert('Profile updated!');
   };
 
@@ -233,6 +331,7 @@ const ProviderDashboard = () => {
   const handleSaveLocation = () => {
     setLocation(locationInput);
     setIsEditingLocation(false);
+    saveLocationToBackend(locationInput);
   };
 
   // Logout
@@ -416,8 +515,8 @@ const ProviderDashboard = () => {
             <div className="profile-info-box wide-profile-box">
               <div className="profile-info-right">
                 <h2 className="profile-reviews-heading" style={{fontSize: '1.33rem', marginBottom: '0.7rem'}}>Profile Details</h2>
-                <div className="profile-info-item"><strong>Name:</strong> {provider.name}</div>
-                <div className="profile-info-item"><strong>Email:</strong> {provider.email}</div>
+                <div className="profile-info-item"><strong>Name:</strong> {userData.name}</div>
+                <div className="profile-info-item"><strong>Email:</strong> {userData.email}</div>
                 {/* Phone */}
                 <div className="profile-info-item phone-box-wide">
                   <label htmlFor="phone"><strong>Phone Number:</strong></label>

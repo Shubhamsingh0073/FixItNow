@@ -11,72 +11,10 @@ const categories = [
   { id: 'appliance', name: 'Appliance Repair' }
 ];
 
-const mockServiceProviders = [
-  {
-    id: 1,
-    name: "John's Plumbing",
-    category: "plumbing",
-    rating: 4.8,
-    reviews: 127,
-    distance: "9th block, Jayanagar, Bangalore, 560041",
-    phone: "+1234567890",
-    email: "john@example.com",
-    description: "Expert plumbing services with 15 years of experience",
-    available: true
-  },
-  {
-    id: 2,
-    name: "Jane's Electrical",
-    category: "electrical",
-    rating: 4.6,
-    reviews: 99,
-    distance: "Rajajinagar, Bangalore, 560069",
-    phone: "+1987654321",
-    email: "jane@example.com",
-    description: "Certified electrical solutions for homes and offices",
-    available: false
-  },
-  {
-    id: 3,
-    name: "Alex Carpentry",
-    category: "carpentry",
-    rating: 4.7,
-    reviews: 87,
-    distance: "Mysore, Karnataka",
-    phone: "+1472583690",
-    email: "alex@example.com",
-    description: "Professional carpentry for custom furniture & repairs",
-    available: true
-  },
-  {
-    id: 4,
-    name: "CleanPro Services",
-    category: "cleaning",
-    rating: 4.5,
-    reviews: 76,
-    distance: "Bangalore, 560079",
-    phone: "+1357924680",
-    email: "cleanpro@example.com",
-    description: "Trusted cleaning solutions for homes and offices",
-    available: true
-  },
-  {
-    id: 5,
-    name: "FixMyAppliance",
-    category: "appliance",
-    rating: 4.4,
-    reviews: 61,
-    distance: "Delhi",
-    phone: "+1122334455",
-    email: "fixmyappliance@example.com",
-    description: "Reliable appliance repair with fast turnaround",
-    available: true
-  }
-];
-
 const mockPastBookings = [
-  { ...mockServiceProviders[1], bookingDate: "2025-09-25" },
-  { ...mockServiceProviders[2], bookingDate: "2025-09-20" }
+  // You can keep this for testing or remove if you want to fetch bookings from backend
+  // { ...mockServiceProviders[1], bookingDate: "2025-09-25" },
+  // { ...mockServiceProviders[2], bookingDate: "2025-09-20" }
 ];
 
 const CustomerDashboard = () => {
@@ -87,6 +25,7 @@ const CustomerDashboard = () => {
   const [latLng, setLatLng] = useState(null);
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
 
+  // This will be set from backend (dynamic)
   const [serviceProviders, setServiceProviders] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -94,6 +33,27 @@ const CustomerDashboard = () => {
   const [activePage, setActivePage] = useState('home');
   const [phoneInput, setPhoneInput] = useState('');
   const [connectedProvider, setConnectedProvider] = useState(null);
+
+  useEffect(() => {
+    const fetchProviders = async () => {
+      try {
+        // Fetch all providers from backend. Assumes array of provider objects.
+        const res = await fetch('http://localhost:8087/users/providers');
+        if (!res.ok) throw new Error('Failed to fetch providers');
+        const providers = await res.json();
+
+        // If the backend returns a single object, convert it to array:
+        const providersArray = Array.isArray(providers) ? providers : [providers];
+
+        setServiceProviders(providersArray);
+      } catch (error) {
+        console.error('Error fetching providers:', error);
+        setServiceProviders([]);
+      }
+    };
+
+    fetchProviders();
+  }, []);
 
   // Location function (OpenStreetMap, editable)
   useEffect(() => {
@@ -131,12 +91,16 @@ const CustomerDashboard = () => {
     // eslint-disable-next-line
   }, []);
 
-  // Filtering providers for Home page search
-  // *** CHANGED: Only filter by distance ***
+  // Filtering providers for Home page search (category logic updated)
   const filteredProviders = serviceProviders.filter(provider => {
-    const matchesSearch = provider.distance.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || provider.category === selectedCategory;
-    return matchesSearch && matchesCategory;
+    // Category filtering based on provider name (case-insensitive)
+    let matchesCategory = true;
+    if (selectedCategory !== 'all') {
+      matchesCategory = provider.name && provider.name.toLowerCase().includes(selectedCategory);
+    }
+    // Search filtering by location/address (case-insensitive)
+    const matchesSearch = (provider.location || '').toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesCategory && matchesSearch;
   });
 
   // Remove connected provider from "other services"
@@ -188,17 +152,25 @@ const CustomerDashboard = () => {
     }}>
       <div style={{ flex: 1 }}>
         <div style={{ fontWeight: 700, fontSize: "1.37rem", marginBottom: "0.5rem" }}>
-          {provider.name}</div>
-        <div style={{ marginBottom: "0.4rem", display: "flex", alignItems: "center" }}>
-          <FaStar style={{ color: "#fbbf24", marginRight: "0.25rem" }} />
-          {provider.rating} ({provider.reviews} reviews)
+          {provider.name}
         </div>
+        {(provider.rating || provider.reviews) && (
+          <div style={{ marginBottom: "0.4rem", display: "flex", alignItems: "center" }}>
+            <FaStar style={{ color: "#fbbf24", marginRight: "0.25rem" }} />
+            {provider.rating} ({provider.reviews} reviews)
+          </div>
+        )}
         <div style={{ marginBottom: "0.4rem", display: "flex", alignItems: "center" }}>
           <FaMapMarkerAlt style={{ marginRight: "0.5em" }} /> 
-          {provider.distance}
+          {provider.location}
         </div>
         <div style={{ marginBottom: "0.4rem", color: "#555" }}>
-          {provider.description}
+          <strong>Description:</strong> {provider.description}
+        </div>
+        <div style={{ marginBottom: "0.4rem", color: "#555" }}>
+          <strong>Availability:</strong> 
+          {provider.availability?.from ? provider.availability.from : ''} 
+          {provider.availability?.to ? ` to ${provider.availability.to}` : ''}
         </div>
         <div style={{ marginBottom: "0.3rem", display: "flex", alignItems: "center" }}>
           <FaPhone style={{ marginRight: "0.5em" }} /> {provider.phone} &nbsp;
@@ -215,21 +187,29 @@ const CustomerDashboard = () => {
       </div>
     </div>
   );
-
+  
   // Card component for other services
   const ProviderCard = ({ provider, showBookingDate }) => (
     <div className="provider-card">
       <div className="provider-info">
         <h3>{provider.name}</h3>
-        <div className="rating">
-          <FaStar /> {provider.rating} ({provider.reviews} reviews)
-        </div>
-        <p className="distance"><FaMapMarkerAlt /> {provider.distance}</p>
-        <p className="description">{provider.description}</p>
-        <div className="contact-info">
-          <p><FaPhone /> {provider.phone}</p>
-          <p><FaEnvelope /> {provider.email}</p>
-        </div>
+        {(provider.rating || provider.reviews) && (
+          <div className="rating">
+            <FaStar /> {provider.rating} ({provider.reviews} reviews)
+          </div>
+        )}
+        <p className="distance" style={{ display: "flex", alignItems: "center", gap: "0.5em" }}>
+          <FaMapMarkerAlt /> {provider.location}</p>
+        <p style={{ display: "flex", alignItems: "center", gap: "0.5em" }}>
+          <FaPhone /> {provider.phone}</p>
+        <p style={{ display: "flex", alignItems: "center", gap: "0.5em" }}>
+          <FaEnvelope /> {provider.email}</p>
+        <p className="description">
+          <strong>Description:</strong> {provider.description}</p>
+        <p><strong>Availability:</strong> 
+          {provider.availability?.from ? provider.availability.from : ''} 
+          {provider.availability?.to ? ` to ${provider.availability.to}` : ''}
+        </p>
         {showBookingDate && (
           <div className="booking-date">
             <FaCalendarAlt /> {provider.bookingDate}
@@ -239,12 +219,13 @@ const CustomerDashboard = () => {
       <button
         className="connect-button"
         onClick={() => handleConnect(provider)}
-        disabled={!provider.available}
+        disabled={provider.available === false}
       >
-        {provider.available ? 'Connect Now' : 'Currently Unavailable'}
+        {provider.available === false ? 'Currently Unavailable' : 'Connect Now'}
       </button>
     </div>
   );
+  
 
   useEffect(() => {
     // Get current user from localStorage
@@ -253,7 +234,7 @@ const CustomerDashboard = () => {
       setCurrentUser(userData);
       setPhoneInput(userData.phone || '');
     }
-    setServiceProviders(mockServiceProviders);
+    // Providers are fetched from backend in first useEffect
   }, []);
 
   return (
@@ -400,7 +381,7 @@ const CustomerDashboard = () => {
                 <FaSearch />
                 <input
                   type="text"
-                  placeholder="Search by location (distance)..."
+                  placeholder="Search by location (address)..."
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                 />

@@ -9,6 +9,7 @@ import FixItNow.model.Users;
 import FixItNow.model.UserRole;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface UsersRepository extends JpaRepository<Users, String> { // <-- Change primary key type to Long
@@ -22,10 +23,12 @@ public interface UsersRepository extends JpaRepository<Users, String> { // <-- C
     boolean existsByEmail(String email);
 
     Users findByEmail(String email);
-
+    Optional<Users> findById(String userId);
     // Find all users with a specific role (for finding all providers)
     List<Users> findByRole(UserRole role);
     
     @Query("SELECT MAX(u.id) FROM Users u")
     String findMaxUserId();
+    
+    
 }

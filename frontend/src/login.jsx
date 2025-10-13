@@ -96,7 +96,7 @@ const Login = () => {
       }
 
       // Store token (optional)
-      // localStorage.setItem('token', data.token);
+      localStorage.setItem('token', data.token);
 
       // Navigate based on role
       switch (formData.userType) {
@@ -194,10 +194,6 @@ const Login = () => {
 
             {/* Options */}
             <div className="form-options">
-              <label className="remember-me">
-                <input type="checkbox" />
-                <span>Remember me</span>
-              </label>
               <a
                 href="#"
                 className="forgot-password"

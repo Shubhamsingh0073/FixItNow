@@ -88,4 +88,20 @@ public class UsersManager {
 	        }
 	}
 	
+	 
+	 public String validateToken(String token) {
+		    return jwt.validateToken(token);
+		}
+	 
+	 public Users getUserByEmail(String email) {
+		    return ur.findByEmail(email);
+		}
+	 
+	 public void updatePhone(String email, String phone) {
+		    Users user = ur.findByEmail(email);
+		    if (user != null) {
+		        user.setPhno(phone);
+		        ur.save(user);
+		    }
+		}
 }
