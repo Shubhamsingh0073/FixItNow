@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FaMapMarkerAlt, FaSearch, FaTools, FaStar, FaPhone, FaEnvelope, FaUser, FaHome, FaCalendarAlt, FaUserCircle, FaSignOutAlt, FaQuestionCircle, FaRegComments, FaRegThumbsUp } from 'react-icons/fa';
+import { FaMapMarkerAlt, FaSearch, FaTools, FaStar, FaPhone, FaEnvelope, FaUser, FaHome, FaCalendarAlt, FaUserCircle, FaSignOutAlt, FaQuestionCircle, FaRegComments, FaRegThumbsUp, FaEdit, FaTimes, FaCheck } from 'react-icons/fa';
 import './CustomerDashboard.css';
 
 const categories = [
@@ -11,7 +11,6 @@ const categories = [
   { id: 'appliance', name: 'Appliance Repair' }
 ];
 
-// Simulated provider cards
 const mockServiceProviders = [
   {
     id: 1,
@@ -19,7 +18,7 @@ const mockServiceProviders = [
     category: "plumbing",
     rating: 4.8,
     reviews: 127,
-    distance: "2.3 km",
+    distance: "9th block, Jayanagar, Bangalore, 560041",
     phone: "+1234567890",
     email: "john@example.com",
     description: "Expert plumbing services with 15 years of experience",
@@ -31,7 +30,7 @@ const mockServiceProviders = [
     category: "electrical",
     rating: 4.6,
     reviews: 99,
-    distance: "4.1 km",
+    distance: "Rajajinagar, Bangalore, 560069",
     phone: "+1987654321",
     email: "jane@example.com",
     description: "Certified electrical solutions for homes and offices",
@@ -43,7 +42,7 @@ const mockServiceProviders = [
     category: "carpentry",
     rating: 4.7,
     reviews: 87,
-    distance: "3.2 km",
+    distance: "Mysore, Karnataka",
     phone: "+1472583690",
     email: "alex@example.com",
     description: "Professional carpentry for custom furniture & repairs",
@@ -55,7 +54,7 @@ const mockServiceProviders = [
     category: "cleaning",
     rating: 4.5,
     reviews: 76,
-    distance: "1.9 km",
+    distance: "Bangalore, 560079",
     phone: "+1357924680",
     email: "cleanpro@example.com",
     description: "Trusted cleaning solutions for homes and offices",
@@ -67,7 +66,7 @@ const mockServiceProviders = [
     category: "appliance",
     rating: 4.4,
     reviews: 61,
-    distance: "5.0 km",
+    distance: "Delhi",
     phone: "+1122334455",
     email: "fixmyappliance@example.com",
     description: "Reliable appliance repair with fast turnaround",
@@ -75,60 +74,79 @@ const mockServiceProviders = [
   }
 ];
 
-// Simulated bookings
-const mockCurrentBookings = [
-  { ...mockServiceProviders[0], bookingDate: "2025-10-06" },
-  { ...mockServiceProviders[3], bookingDate: "2025-10-07" }
-];
 const mockPastBookings = [
   { ...mockServiceProviders[1], bookingDate: "2025-09-25" },
   { ...mockServiceProviders[2], bookingDate: "2025-09-20" }
 ];
 
 const CustomerDashboard = () => {
-  const [location, setLocation] = useState(null);
+  // Location state (address as text)
+  const [location, setLocation] = useState('');
+  const [isEditingLocation, setIsEditingLocation] = useState(false);
+  const [locationInput, setLocationInput] = useState('');
+  const [latLng, setLatLng] = useState(null);
+  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
+
   const [serviceProviders, setServiceProviders] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [currentUser, setCurrentUser] = useState({ name: 'Customer Name', email: 'customer@email.com', phone: '' });
   const [activePage, setActivePage] = useState('home');
   const [phoneInput, setPhoneInput] = useState('');
+  const [connectedProvider, setConnectedProvider] = useState(null);
 
+  // Location function (OpenStreetMap, editable)
   useEffect(() => {
+    setIsLoadingLocation(true);
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          setLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          });
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          setLatLng({ lat, lng });
+
+          // Fetch address from OpenStreetMap Nominatim
+          fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
+            .then(response => response.json())
+            .then(data => {
+              setLocation(data.display_name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+              setLocationInput(data.display_name || '');
+              setIsLoadingLocation(false);
+            })
+            .catch(err => {
+              setLocation(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+              setIsLoadingLocation(false);
+            });
         },
         (error) => {
-          console.error("Error getting location:", error);
+          setLocation('Location permission denied or unavailable.');
+          setIsLoadingLocation(false);
         }
       );
+    } else {
+      setLocation('Geolocation not supported.');
+      setIsLoadingLocation(false);
     }
-
-    // Get current user from localStorage
-    const userData = JSON.parse(localStorage.getItem('currentUser'));
-    if (userData) {
-      setCurrentUser(userData);
-      setPhoneInput(userData.phone || '');
-    }
-
-    setServiceProviders(mockServiceProviders);
+    // Only run once on mount
+    // eslint-disable-next-line
   }, []);
 
   // Filtering providers for Home page search
+  // *** CHANGED: Only filter by distance ***
   const filteredProviders = serviceProviders.filter(provider => {
-    const matchesSearch = provider.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      provider.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = provider.distance.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === 'all' || provider.category === selectedCategory;
     return matchesSearch && matchesCategory;
-  }).slice(0, 5); // Only show 5 cards
+  });
+
+  // Remove connected provider from "other services"
+  const otherProviders = connectedProvider
+    ? filteredProviders.filter(p => p.id !== connectedProvider.id)
+    : filteredProviders;
 
   const handleConnect = (provider) => {
-    alert(`Connecting to ${provider.name}`);
+    setConnectedProvider(provider);
+    setActivePage('home');
   };
 
   const handleLogout = () => {
@@ -142,7 +160,63 @@ const CustomerDashboard = () => {
     alert("Phone number saved!");
   };
 
-  // Card component
+  // Edit Location Button
+  const handleEditLocation = () => {
+    setLocationInput(location);
+    setIsEditingLocation(true);
+  };
+
+  // Save Location Button
+  const handleSaveLocation = () => {
+    setLocation(locationInput);
+    setIsEditingLocation(false);
+  };
+
+  // Wide Card for connected provider
+  const WideProviderCard = ({ provider, showBookingDate }) => (
+    <div className="customer-wide-card" style={{
+      width: "100%",
+      background: "#fff",
+      borderRadius: "1rem",
+      boxShadow: "0 2px 16px rgba(80,36,143,0.12)",
+      marginBottom: "2rem",
+      padding: "2.1rem 2.8rem",
+      display: "flex",
+      alignItems: "center",
+      gap: "2.8rem",
+      justifyContent: "flex-start"
+    }}>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontWeight: 700, fontSize: "1.37rem", marginBottom: "0.5rem" }}>
+          {provider.name}</div>
+        <div style={{ marginBottom: "0.4rem", display: "flex", alignItems: "center" }}>
+          <FaStar style={{ color: "#fbbf24", marginRight: "0.25rem" }} />
+          {provider.rating} ({provider.reviews} reviews)
+        </div>
+        <div style={{ marginBottom: "0.4rem", display: "flex", alignItems: "center" }}>
+          <FaMapMarkerAlt style={{ marginRight: "0.5em" }} /> 
+          {provider.distance}
+        </div>
+        <div style={{ marginBottom: "0.4rem", color: "#555" }}>
+          {provider.description}
+        </div>
+        <div style={{ marginBottom: "0.3rem", display: "flex", alignItems: "center" }}>
+          <FaPhone style={{ marginRight: "0.5em" }} /> {provider.phone} &nbsp;
+        </div>
+        <div style={{ marginBottom: "0.5rem", display: "flex", alignItems: "center" }}> 
+          <FaEnvelope style={{ marginRight: "0.5em" }}/> {provider.email}
+        </div>
+        {showBookingDate && (
+          <div style={{ marginTop: "0.5rem", fontWeight: 500, display: "flex", alignItems: "center" }}>
+            <FaCalendarAlt style={{ marginRight: "0.5em" }} />
+            {provider.bookingDate || "2025-10-13"}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  // Card component for other services
   const ProviderCard = ({ provider, showBookingDate }) => (
     <div className="provider-card">
       <div className="provider-info">
@@ -171,6 +245,16 @@ const CustomerDashboard = () => {
       </button>
     </div>
   );
+
+  useEffect(() => {
+    // Get current user from localStorage
+    const userData = JSON.parse(localStorage.getItem('currentUser'));
+    if (userData) {
+      setCurrentUser(userData);
+      setPhoneInput(userData.phone || '');
+    }
+    setServiceProviders(mockServiceProviders);
+  }, []);
 
   return (
     <div className="dashboard-root">
@@ -206,18 +290,117 @@ const CustomerDashboard = () => {
           <div>
             <div className="dashboard-header">
               <h1 className="dashboard-header-bold-white">Find Services Near You</h1>
-              {location && (
-                <p>
-                  <FaMapMarkerAlt /> Your location: {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
-                </p>
-              )}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: "100%",
+                  margin: "1.4em 0 1.2em 0"
+                }}
+              >
+                <FaMapMarkerAlt style={{ fontSize: "1.2em", marginRight: "0.7em", color: "#222" }} />
+                {!isEditingLocation ? (
+                  <>
+                    <div style={{
+                      flex: 1,
+                      textAlign: "center",
+                      fontWeight: 600,
+                      fontSize: "1em",
+                      color: "#f0f0f0ea"
+                    }}>
+                      {isLoadingLocation ? "Fetching location..." : location}
+                    </div>
+                    <button
+                      className="edit-location-btn"
+                      style={{
+                        width: "38px",
+                        height: "38px",
+                        minWidth: "38px",
+                        maxWidth: "38px",
+                        border: "none",
+                        borderRadius: "10px",
+                        marginLeft: "1em",
+                        background: "#7c4dff",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        cursor: "pointer"
+                      }}
+                      onClick={handleEditLocation}
+                      title="Edit address"
+                    >
+                      <FaEdit style={{ fontSize: "1.18em", color: "#fff" }} />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <input
+                      type="text"
+                      value={locationInput}
+                      onChange={e => setLocationInput(e.target.value)}
+                      placeholder="Enter your address"
+                      style={{
+                        flex: 1,
+                        textAlign: "center",
+                        padding: "0.5em",
+                        borderRadius: "0.5em",
+                        fontSize: "1em",
+                        marginRight: "1em",
+                        marginLeft: "0.4em"
+                      }}
+                    />
+                    <button
+                      className="edit-location-btn"
+                      style={{
+                        width: "38px",
+                        height: "38px",
+                        minWidth: "38px",
+                        maxWidth: "38px",
+                        border: "none",
+                        borderRadius: "10px",
+                        background: "#4fd1c5",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        marginRight: "0.5em",
+                        cursor: "pointer"
+                      }}
+                      onClick={handleSaveLocation}
+                      title="Save address"
+                    >
+                      <FaCheck style={{ fontSize: "1.18em", color: "#fff" }} />
+                    </button>
+                    <button
+                      className="edit-location-btn"
+                      style={{
+                        width: "38px",
+                        height: "38px",
+                        minWidth: "38px",
+                        maxWidth: "38px",
+                        border: "none",
+                        borderRadius: "10px",
+                        background: "#e53e3e",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        cursor: "pointer"
+                      }}
+                      onClick={() => setIsEditingLocation(false)}
+                      title="Cancel"
+                    >
+                      <FaTimes style={{ fontSize: "1.18em", color: "#fff" }} />
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
             <div className="search-section">
               <div className="search-bar">
                 <FaSearch />
                 <input
                   type="text"
-                  placeholder="Search for services..."
+                  placeholder="Search by location (distance)..."
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                 />
@@ -235,10 +418,20 @@ const CustomerDashboard = () => {
                 ))}
               </div>
             </div>
-            <div className="providers-grid">
-              {filteredProviders.map(provider => (
-                <ProviderCard key={provider.id} provider={provider} />
-              ))}
+            {/* Connected wide card */}
+            {connectedProvider && (
+              <WideProviderCard provider={connectedProvider} />
+            )}
+            {/* Other services */}
+            <div>
+              {connectedProvider && otherProviders.length > 0 && (
+                <h2 className="dashboard-header-bold-white" style={{ fontSize: '1.25rem', marginBottom: '1rem' }}>Other Services</h2>
+              )}
+              <div className="providers-grid">
+                {otherProviders.map(provider => (
+                  <ProviderCard key={provider.id} provider={provider} />
+                ))}
+              </div>
             </div>
           </div>
         )}
@@ -248,9 +441,7 @@ const CustomerDashboard = () => {
           <div className="bookings-page">
             <h2 className="dashboard-header-bold-white">Current Bookings</h2>
             <div className="providers-grid">
-              {mockCurrentBookings.map(provider => (
-                <ProviderCard key={provider.id} provider={provider} showBookingDate />
-              ))}
+              {connectedProvider && <WideProviderCard provider={connectedProvider} showBookingDate />}
             </div>
             <h2 className="dashboard-header-bold-white">Past Bookings</h2>
             <div className="providers-grid">

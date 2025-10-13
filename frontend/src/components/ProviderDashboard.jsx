@@ -1,24 +1,53 @@
-import React, { useState } from 'react';
-import { FaUserCircle, FaHome, FaCalendarAlt, FaSignOutAlt, FaQuestionCircle, FaRegComments, FaEdit, FaTrash, FaPlus } from 'react-icons/fa';
+import React, { useState, useEffect } from 'react';
+import { FaMapMarkerAlt, FaUserCircle, FaPhone, FaEnvelope, FaHome, FaCalendarAlt, FaSignOutAlt, FaQuestionCircle, FaRegComments, FaEdit, FaTrash, FaPlus } from 'react-icons/fa';
 import './ProviderDashboard.css';
 
-const categories = ['Plumbing', 'Electrical', 'Carpentry', 'Cleaning', 'Appliance Repair', 'Others'];
-
-// Time dropdown options: 12-hour format
-function generateTimeOptions() {
-  const times = [];
-  for (let h = 0; h < 24; h++) {
-    for (let m = 0; m < 60; m += 30) {
-      const hour = h % 12 === 0 ? 12 : h % 12;
-      const minute = m === 0 ? "00" : "30";
-      const ampm = h < 12 ? "am" : "pm";
-      times.push(`${hour}:${minute} ${ampm}`);
-    }
+// Mock data for customers
+const mockCustomers = [
+  {
+    id: 1,
+    name: 'Alice Johnson',
+    phone: '+1234567890',
+    email: 'alice@email.com',
+    category: 'Plumbing'
+  },
+  {
+    id: 2,
+    name: 'Bob Smith',
+    phone: '+1987654321',
+    email: 'bob@email.com',
+    category: 'Electrical'
+  },
+  {
+    id: 3,
+    name: 'Carol Lee',
+    phone: '+1472583690',
+    email: 'carol@email.com',
+    category: 'Carpentry'
+  },
+  {
+    id: 4,
+    name: 'David King',
+    phone: '+1357924680',
+    email: 'david@email.com',
+    category: 'Cleaning'
+  },
+  {
+    id: 5,
+    name: 'Emma Brown',
+    phone: '+1122334455',
+    email: 'emma@email.com',
+    category: 'Appliance Repair'
   }
-  return times;
-}
-const timeOptions = generateTimeOptions();
+];
 
+// Mock bookings
+const mockPastBookings = [
+  { ...mockCustomers[1], status: 'Completed', bookingDate: '2025-09-25' },
+  { ...mockCustomers[2], status: 'Completed', bookingDate: '2025-09-20' },
+];
+
+// Mock provider profile
 const initialProvider = {
   name: 'Provider Name',
   email: 'provider@email.com',
@@ -34,11 +63,38 @@ const initialProvider = {
   ]
 };
 
-const ProviderDashboard = () => {
-  const [activePage, setActivePage] = useState('profile');
-  const [provider, setProvider] = useState(initialProvider);
+const categories = ['Plumbing', 'Electrical', 'Carpentry', 'Cleaning', 'Appliance Repair', 'Others'];
 
-  // Profile details editing
+function generateTimeOptions() {
+  const times = [];
+  for (let h = 0; h < 24; h++) {
+    for (let m = 0; m < 60; m += 30) {
+      const hour = h % 12 === 0 ? 12 : h % 12;
+      const minute = m === 0 ? "00" : "30";
+      const ampm = h < 12 ? "am" : "pm";
+      times.push(`${hour}:${minute} ${ampm}`);
+    }
+  }
+  return times;
+}
+const timeOptions = generateTimeOptions();
+
+const bookingStatusOptions = ['Pending', 'In Progress', 'Completed'];
+
+const ProviderDashboard = () => {
+  // Location state (address as text)
+  const [location, setLocation] = useState('');
+  const [isEditingLocation, setIsEditingLocation] = useState(false);
+  const [locationInput, setLocationInput] = useState('');
+  const [latLng, setLatLng] = useState(null);
+  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
+
+  // Sidebar navigation
+  const [activePage, setActivePage] = useState('home');
+  const [requests, setRequests] = useState(mockCustomers);
+  const [acceptedRequest, setAcceptedRequest] = useState(null);
+  const [currentBookingStatus, setCurrentBookingStatus] = useState('Pending');
+  const [provider, setProvider] = useState(initialProvider);
   const [isEditing, setIsEditing] = useState(false);
   const [phoneInput, setPhoneInput] = useState(provider.phone);
   const [availabilityFrom, setAvailabilityFrom] = useState(provider.availability.from);
@@ -53,6 +109,59 @@ const ProviderDashboard = () => {
   const [addServiceName, setAddServiceName] = useState('');
   const [addServicePrice, setAddServicePrice] = useState('');
   const [editServiceIdx, setEditServiceIdx] = useState(null);
+
+  // Get geolocation and address using OpenStreetMap Nominatim
+  useEffect(() => {
+    setIsLoadingLocation(true);
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          setLatLng({ lat, lng });
+
+          // Fetch address from OpenStreetMap Nominatim
+          fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
+            .then(response => response.json())
+            .then(data => {
+              setLocation(data.display_name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+              setLocationInput(data.display_name || '');
+              setIsLoadingLocation(false);
+            })
+            .catch(err => {
+              setLocation(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+              setIsLoadingLocation(false);
+            });
+        },
+        (error) => {
+          setLocation('Location permission denied or unavailable.');
+          setIsLoadingLocation(false);
+        }
+      );
+    } else {
+      setLocation('Geolocation not supported.');
+      setIsLoadingLocation(false);
+    }
+    // Only run once on mount
+    // eslint-disable-next-line
+  }, []);
+
+  // Accept request
+  const handleAcceptRequest = (customer) => {
+    setAcceptedRequest({
+      ...customer,
+      status: currentBookingStatus,
+      bookingDate: '2025-10-06'
+    });
+    setRequests(requests.filter(req => req.id !== customer.id));
+    setActivePage('home');
+  };
+
+  // Change status in bookings
+  const handleBookingStatusChange = (newStatus) => {
+    setCurrentBookingStatus(newStatus);
+    setAcceptedRequest(prev => prev ? { ...prev, status: newStatus } : null);
+  };
 
   // Only allow digits, max 10
   const handlePhoneInputChange = (e) => {
@@ -114,9 +223,79 @@ const ProviderDashboard = () => {
     setIsEditing(true);
   };
 
+  // Edit Location Button
+  const handleEditLocation = () => {
+    setLocationInput(location);
+    setIsEditingLocation(true);
+  };
+
+  // Save Location Button
+  const handleSaveLocation = () => {
+    setLocation(locationInput);
+    setIsEditingLocation(false);
+  };
+
+  // Logout
+  const handleLogout = () => {
+    window.location.href = '/login';
+  };
+
+  // Card for customer request (Home and Past Bookings Small Card)
+  const CustomerSmallCard = ({ customer, showAccept, acceptedStatus }) => (
+    <div className={`provider-customer-card small-card ${acceptedStatus ? 'accepted-card' : ''}`}>
+      <div className="card-profile">
+        <FaUserCircle size={38} />
+      </div>
+      <div className="card-info">
+        <div className="card-info-item"><strong>Name:</strong> {customer.name}</div>
+        <div className="card-info-item"><strong>Email:</strong> {customer.email}</div>
+        <div className="card-info-item"><strong>Phone:</strong> {customer.phone}</div>
+        <div className="card-info-item"><strong>Category:</strong> {customer.category}</div>
+        {customer.bookingDate && (
+          <div className="card-info-item"><FaCalendarAlt /> {customer.bookingDate}</div>
+        )}
+        {acceptedStatus && (
+          <div className="card-info-item accepted-status">
+            Status:
+            <span className={`accepted-status-label status-${customer.status.toLowerCase().replace(/ /g, '-')}`}>{customer.status}</span>
+          </div>
+        )}
+        {showAccept && (
+          <div className="accept-btn-row">
+            <button className="accept-request-btn" onClick={() => handleAcceptRequest(customer)}>Accept Request</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  // Card for accepted/current booking (Wide Card)
+  const CustomerWideCard = ({ customer, acceptedStatus }) => (
+    <div className={`provider-customer-card wide-card ${acceptedStatus ? 'accepted-card' : ''}`}>
+      <div className="card-profile">
+        <FaUserCircle size={56} />
+      </div>
+      <div className="card-info">
+        <div className="card-info-item"><strong>Name:</strong> {customer.name}</div>
+        <div className="card-info-item"><strong>Email:</strong> {customer.email}</div>
+        <div className="card-info-item"><strong>Phone:</strong> {customer.phone}</div>
+        <div className="card-info-item"><strong>Category:</strong> {customer.category}</div>
+        {customer.bookingDate && (
+          <div className="card-info-item"><FaCalendarAlt /> {customer.bookingDate}</div>
+        )}
+        {acceptedStatus && (
+          <div className="card-info-item accepted-status">
+            Status:
+            <span className={`accepted-status-label status-${customer.status.toLowerCase().replace(/ /g, '-')}`}>{customer.status}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="provider-dashboard-root">
-      {/* Sidebar */}
+      {/* Side Panel */}
       <div className="sidebar">
         <div className="sidebar-title">FixItNow</div>
         <div className="sidebar-subtitle">Provider</div>
@@ -132,13 +311,105 @@ const ProviderDashboard = () => {
           </button>
         </nav>
         <div className="sidebar-bottom">
-          <button className="logout-button" onClick={() => window.location.href = '/login'}>
+          <button className="logout-button" onClick={handleLogout}>
             <FaSignOutAlt /> Logout
           </button>
         </div>
       </div>
+
       {/* Main Content */}
       <div className="dashboard-main">
+        {/* Home */}
+        {activePage === 'home' && (
+          <div>
+            <div className="dashboard-header">
+              <h1 className="dashboard-header-bold-white">Customers Near You</h1>
+              <div style={{marginTop: '0.6rem', marginBottom: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.8rem'}}>
+                <FaMapMarkerAlt style={{fontSize: '1.2em'}} />
+                {isLoadingLocation ? (
+                  <span style={{ color: "#f0f0f0ea" }}>Fetching location...</span>
+                ) : isEditingLocation ? (
+                  <>
+                    <input
+                      type="text"
+                      value={locationInput}
+                      onChange={e => setLocationInput(e.target.value)}
+                      placeholder="Enter your address"
+                      style={{ padding: "0.5em", borderRadius: "0.5em", fontSize: "1em", width: "18em" }}
+                    />
+                    <button className="accept-request-btn" style={{marginLeft: "0.6em"}} onClick={handleSaveLocation}>Save</button>
+                    <button className="accept-request-btn" style={{marginLeft: "0.6em", background: "#e53e3e"}} onClick={() => setIsEditingLocation(false)}>Cancel</button>
+                  </>
+                ) : (
+                  <>
+                    <span style={{fontSize:"1em", color: "#f0f0f0ea", fontWeight: "500"}}>
+                      {location}
+                    </span>
+                    <button className="accept-request-btn" style={{marginLeft: "0.6em"}} onClick={handleEditLocation}>
+                      <FaEdit style={{marginRight: "0.4em"}} />
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+            {acceptedRequest && (
+              <div>
+                <CustomerWideCard customer={acceptedRequest} acceptedStatus />
+              </div>
+            )}
+            <div style={{ marginTop: acceptedRequest ? '2.2rem' : 0 }}>
+              <h2 className="dashboard-header-bold-white" style={{ fontSize: '1.25rem', marginBottom: '1rem' }}>Customer Requests</h2>
+              <div className="providers-grid">
+                {requests.slice(0, 5).map(customer => (
+                  <CustomerSmallCard key={customer.id} customer={customer} showAccept />
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Bookings */}
+        {activePage === 'bookings' && (
+          <div className="bookings-page">
+            <h2 className="dashboard-header-bold-white">Current Bookings</h2>
+            <div className="providers-grid">
+              {acceptedRequest && (
+                <div className="provider-customer-card wide-card accepted-card">
+                  <div className="card-profile">
+                    <FaUserCircle size={56} />
+                  </div>
+                  <div className="card-info">
+                    <div className="card-info-item"><strong>Name:</strong> {acceptedRequest.name}</div>
+                    <div className="card-info-item"><strong>Email:</strong> {acceptedRequest.email}</div>
+                    <div className="card-info-item"><strong>Phone:</strong> {acceptedRequest.phone}</div>
+                    <div className="card-info-item"><strong>Category:</strong> {acceptedRequest.category}</div>
+                    <div className="card-info-item"><FaCalendarAlt /> {acceptedRequest.bookingDate}</div>
+                  </div>
+                  <div className="booking-status-dropdown">
+                    <label htmlFor="booking-status-select"><strong>Status:</strong></label>
+                    <select
+                      id="booking-status-select"
+                      value={currentBookingStatus}
+                      onChange={e => handleBookingStatusChange(e.target.value)}
+                    >
+                      {bookingStatusOptions.map(opt => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
+            <h2 className="dashboard-header-bold-white">Past Bookings</h2>
+            <div className="providers-grid">
+              {mockPastBookings.map(customer => (
+                <CustomerSmallCard key={customer.id} customer={customer} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Profile (same as before) */}
         {activePage === 'profile' && (
           <div className="profile-page">
             {/* Section 1: Profile Details */}
