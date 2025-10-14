@@ -167,7 +167,7 @@ public class UsersController {
         }
         user.setLocation(location);
 
-        ur.save(user); // or usersRepository.save(user);
+        usersRepository.save(user); // or usersRepository.save(user);
         return ResponseEntity.ok(Collections.singletonMap("message", "Location updated successfully"));
     }
     
