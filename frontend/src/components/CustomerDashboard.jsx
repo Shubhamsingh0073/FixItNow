@@ -11,11 +11,6 @@ const categories = [
   { id: 'appliance', name: 'Appliance Repair' }
 ];
 
-const mockPastBookings = [
-  // You can keep this for testing or remove if you want to fetch bookings from backend
-  // { ...mockServiceProviders[1], bookingDate: "2025-09-25" },
-  // { ...mockServiceProviders[2], bookingDate: "2025-09-20" }
-];
 
 const CustomerDashboard = () => {
   // Location state (address as text)
@@ -25,7 +20,7 @@ const CustomerDashboard = () => {
   const [latLng, setLatLng] = useState(null);
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
 
-  // This will be set from backend (dynamic)
+  // set from backend
   const [serviceProviders, setServiceProviders] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -33,6 +28,10 @@ const CustomerDashboard = () => {
   const [activePage, setActivePage] = useState('home');
   const [phoneInput, setPhoneInput] = useState('');
   const [connectedProvider, setConnectedProvider] = useState(null);
+
+  // Booking form
+  const [showModal, setShowModal] = useState(false);
+  const [modalProvider, setModalProvider] = useState(null);
 
   useEffect(() => {
     const fetchProviders = async () => {
@@ -132,8 +131,24 @@ const CustomerDashboard = () => {
 
   // Save Location Button
   const handleSaveLocation = () => {
+    if (locationInput.trim() === "") {
+    // If empty, do NOT update location, just close edit mode
+    setIsEditingLocation(false);
+    return;
+    }
     setLocation(locationInput);
     setIsEditingLocation(false);
+  };
+
+  // Booking form modal
+  const handleSeeDetails = (provider) => {
+    setModalProvider(provider);
+    setShowModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setModalProvider(null);
   };
 
   // Wide Card for connected provider
@@ -154,12 +169,13 @@ const CustomerDashboard = () => {
         <div style={{ fontWeight: 700, fontSize: "1.37rem", marginBottom: "0.5rem" }}>
           {provider.name}
         </div>
-        {(provider.rating || provider.reviews) && (
+        {/* {(provider.rating || provider.reviews) && ( */}
           <div style={{ marginBottom: "0.4rem", display: "flex", alignItems: "center" }}>
             <FaStar style={{ color: "#fbbf24", marginRight: "0.25rem" }} />
-            {provider.rating} ({provider.reviews} reviews)
+            {provider.rating ? provider.rating : "4.5"}
+            ({provider.reviews ? provider.reviews : "120"} reviews)
           </div>
-        )}
+        {/* )} */}
         <div style={{ marginBottom: "0.4rem", display: "flex", alignItems: "center" }}>
           <FaMapMarkerAlt style={{ marginRight: "0.5em" }} /> 
           {provider.location}
@@ -188,16 +204,39 @@ const CustomerDashboard = () => {
     </div>
   );
   
+  const ProviderModal = ({ provider, onClose }) => {
+    if (!provider) return null;
+    return (
+      <div className="modal-overlay" onClick={onClose}>
+        <div className="modal-content" onClick={e => e.stopPropagation()}>
+          <button style={{float: "right"}} onClick={onClose}>×</button>
+          <h2>{provider.name}</h2>
+          <p><FaMapMarkerAlt /> {provider.location}</p>
+          <p><FaPhone /> {provider.phone}</p>
+          <p><FaEnvelope /> {provider.email}</p>
+          <p><strong>Description:</strong> {provider.description}</p>
+          <p><strong>Availability:</strong> {provider.availability?.from} to {provider.availability?.to}</p>
+          <p style={{display: "flex", alignItems: "center"}}><FaStar style={{color: "#fbbf24", marginRight: "0.25em"}} />{provider.rating ? provider.rating : "4.5"} ({provider.reviews ? provider.reviews : "120"} reviews)</p>
+        </div>
+      </div>
+    );
+  };
+
+
   // Card component for other services
   const ProviderCard = ({ provider, showBookingDate }) => (
     <div className="provider-card">
       <div className="provider-info">
         <h3>{provider.name}</h3>
-        {(provider.rating || provider.reviews) && (
+        {/* {(provider.rating || provider.reviews) && (
           <div className="rating">
             <FaStar /> {provider.rating} ({provider.reviews} reviews)
           </div>
-        )}
+        )} */}
+        <div className="rating" style={{ display: "flex", alignItems: "center", marginBottom: "0.4rem" }}>
+          <FaStar style={{ color: "#fbbf24", marginRight: "0.25rem" }} />
+          {provider.rating ? provider.rating : "4.5"} 
+        </div>
         <p className="distance" style={{ display: "flex", alignItems: "center", gap: "0.5em" }}>
           <FaMapMarkerAlt /> {provider.location}</p>
         <p style={{ display: "flex", alignItems: "center", gap: "0.5em" }}>
@@ -218,10 +257,10 @@ const CustomerDashboard = () => {
       </div>
       <button
         className="connect-button"
-        onClick={() => handleConnect(provider)}
+        onClick={() => handleSeeDetails(provider)}
         disabled={provider.available === false}
       >
-        {provider.available === false ? 'Currently Unavailable' : 'Connect Now'}
+        {provider.available === false ? 'Currently Unavailable' : 'See Details'}
       </button>
     </div>
   );
@@ -422,16 +461,26 @@ const CustomerDashboard = () => {
           <div className="bookings-page">
             <h2 className="dashboard-header-bold-white">Current Bookings</h2>
             <div className="providers-grid">
-              {connectedProvider && <WideProviderCard provider={connectedProvider} showBookingDate />}
+              {connectedProvider ? (
+                <WideProviderCard provider={connectedProvider} showBookingDate />
+              ) : (
+                <div style={{ color: '#aaa', fontSize: '1.1rem', fontWeight: '500' }}>
+                  No current bookings.
+                </div>
+              )}
             </div>
             <h2 className="dashboard-header-bold-white">Past Bookings</h2>
             <div className="providers-grid">
-              {mockPastBookings.map(provider => (
-                <ProviderCard key={provider.id} provider={provider} showBookingDate />
-              ))}
+              <div style={{ color: '#aaa', fontSize: '1.1rem', fontWeight: '500' }}>
+                No past bookings.
+              </div>
             </div>
           </div>
         )}
+
+
+        {showModal && <ProviderModal provider={modalProvider} onClose={handleCloseModal} />}
+
 
         {/* Profile */}
         {activePage === 'profile' && (

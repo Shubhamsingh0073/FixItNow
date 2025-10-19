@@ -18,7 +18,7 @@ public class Services {
     @Column(nullable = false)
     private String category;
 
-    @Column(nullable = false)
+    @Column(columnDefinition = "TEXT") 
     private String subcategory;
 
     @Lob

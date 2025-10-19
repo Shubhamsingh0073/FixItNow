@@ -77,6 +77,8 @@ const ProviderDashboard = () => {
   const [addServicePrice, setAddServicePrice] = useState('');
   const [editServiceIdx, setEditServiceIdx] = useState(null);
 
+  const [isEditingServices, setIsEditingServices] = useState(false);
+
   const savePhoneToBackend = async () => {
     const token = localStorage.getItem('token');
     if (!token) {
@@ -125,6 +127,44 @@ const ProviderDashboard = () => {
     }
   };
   
+
+  //save service details to backend 
+  const saveServiceDetailsToBackend = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      alert('No token found. Please login.');
+      return;
+    }
+
+    // Build subcategory object: { "wiring": 300, "repair": 500, ... }
+    const subcategoriesObj = {};
+    services.forEach(srv => {
+      subcategoriesObj[srv.name] = srv.price;
+    });
+
+    const payload = {
+      category: selectedCategory,
+      subcategory: subcategoriesObj
+    };
+
+    try {
+      const response = await fetch('http://localhost:8087/service/me', {
+        method: 'PUT', // or POST if your backend expects it
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) throw new Error('Failed to save category/subcategories');
+      // Optionally show a success message here
+      alert('Service details updated!');
+    } catch (error) {
+      alert('Service details update failed: ' + error.message);
+    }
+  };
+
+
   //save location to backend
   const saveLocationToBackend = async (locationText) => {
     const token = localStorage.getItem('token');
@@ -194,6 +234,32 @@ const ProviderDashboard = () => {
         if (data.description) setDescriptionInput(data.description);
       })
       .catch(err => console.error('Service fetch error:', err));
+    
+    // fetch category and subcategories
+    fetch('http://localhost:8087/service/me', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    })
+      .then(res => res.ok ? res.json() : Promise.reject('Failed to fetch category data'))
+      .then(data => {
+        // data should be { category: "Electrical", subcategories: { wiring: 300, repair: 500, ... } }
+        if (data.category) setSelectedCategory(data.category);
+        if (data.subcategories) {
+          // Convert to services array: [{ name: "wiring", price: 300 }, ...]
+          const savedServices = Object.entries(data.subcategories).map(([name, price]) => ({
+            name,
+            price
+          }));
+          setServices(savedServices);
+        }
+      })
+      .catch(err => {
+        console.error('Category fetch error:', err);
+      });    
+    
   }, []);
   
 
@@ -586,30 +652,54 @@ const ProviderDashboard = () => {
             <div className="profile-info-box wide-profile-box" style={{marginBottom: '0.5rem', position: 'relative', minHeight: '180px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start'}}>
               <h2 className="profile-reviews-heading" style={{fontSize: '1.33rem', marginBottom: '0.7rem'}}>Service Details</h2>
               <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: '1.2rem'}}>
-                <div style={{display: 'flex', alignItems: 'center', gap: '0.7rem'}}>
-                  <label htmlFor="category" style={{fontWeight: 'bold'}}>Category:</label>
-                  <select id="category" value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)}>
-                    {categories.map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                  </select>
-                  {selectedCategory === 'Others' && (
-                    <input
-                      type="text"
-                      placeholder="Mention your service"
-                      value={otherCategory}
-                      onChange={e => setOtherCategory(e.target.value)}
-                      style={{marginLeft: '0.7rem', padding: '0.5rem', borderRadius: '0.5rem', border: '2px solid #e2e8f0'}}
-                    />
+                
+
+                {/* Edit Services Button */}
+                <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: '1.2rem'}}>
+                  <div style={{display: 'flex', alignItems: 'center', gap: '0.7rem'}}>
+                    <label htmlFor="category" style={{fontWeight: 'bold'}}>Category:</label>
+                    <select
+                      id="category"
+                      value={selectedCategory}
+                      onChange={e => setSelectedCategory(e.target.value)}
+                      disabled={!isEditingServices}
+                    >
+                      {categories.map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                    {selectedCategory === 'Others' && (
+                      <input
+                        type="text"
+                        placeholder="Mention your service"
+                        value={otherCategory}
+                        onChange={e => setOtherCategory(e.target.value)}
+                        disabled={!isEditingServices}
+                        style={{marginLeft: '0.7rem', padding: '0.5rem', borderRadius: '0.5rem', border: '2px solid #e2e8f0'}}
+                      />
+                    )}
+                  </div>
+                  {isEditingServices ? (
+                    <>
+                      <button
+                        className="accept-request-btn"
+                        style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}
+                        onClick={() => openAddService()}
+                        disabled={!isEditingServices}
+                      >
+                        <FaPlus /> Add services
+                      </button>            
+                    </>
+                  ) : (
+                    <button
+                      className="accept-request-btn"
+                      style={{background:'#6b46c1'}}
+                      onClick={() => setIsEditingServices(true)}
+                    >
+                      Edit
+                    </button>
                   )}
                 </div>
-                <button
-                  className="accept-request-btn"
-                  style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}
-                  onClick={() => openAddService()}
-                >
-                  <FaPlus /> Add services
-                </button>
               </div>
               {/* List of services */}
               <div style={{marginTop: '0.7rem', width: '100%', flex: 1, display: 'flex', alignItems: services.length === 0 ? 'center' : 'flex-start', justifyContent: services.length === 0 ? 'center' : 'flex-start'}}>
@@ -630,8 +720,21 @@ const ProviderDashboard = () => {
                           <td style={{padding: '0.6rem'}}>{srv.name}</td>
                           <td style={{padding: '0.6rem', textAlign: 'right'}}>{srv.price}</td>
                           <td style={{padding: '0.6rem', textAlign: 'center'}}>
-                            <button style={{marginRight: '0.5rem'}} onClick={() => openAddService(idx)} title="Edit"><FaEdit /></button>
-                            <button onClick={() => handleDeleteService(idx)} title="Delete"><FaTrash /></button>
+                            <button
+                              style={{marginRight: '0.5rem'}}
+                              onClick={() => isEditingServices && openAddService(idx)}
+                              title="Edit"
+                              disabled={!isEditingServices}
+                            >
+                              <FaEdit />
+                            </button>
+                            <button
+                              onClick={() => isEditingServices && handleDeleteService(idx)}
+                              title="Delete"
+                              disabled={!isEditingServices}
+                            >
+                              <FaTrash />
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -639,6 +742,30 @@ const ProviderDashboard = () => {
                   </table>
                 )}
               </div>
+
+              
+              {/* Save button at bottom right */}
+              {isEditingServices && (
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  width: '100%',
+                  marginTop: '1.2rem'
+                }}>
+                  <button
+                    className="save-phone-button"
+                    style={{background:'#2b6cb0'}}
+                    onClick={() => {
+                      saveServiceDetailsToBackend();
+                      setIsEditingServices(false);
+                    }}
+                  >
+                    Save
+                  </button>
+                </div>
+              )}
+
+
             </div>
             {/* Add/Edit Service Modal */}
             {showAddService && (

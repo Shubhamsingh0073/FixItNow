@@ -89,18 +89,39 @@ public class ServicesController {
         }
         // Assuming one service per provider, adjust if multiple
         Services service = servicesList.get(0);
+        
+        ObjectMapper mapper = new ObjectMapper();
 
         // If availability is stored as JSON string, parse it back to a Map
         Map<String, Object> response = new HashMap<>();
         response.put("description", service.getDescription());
         // If availability is stored as JSON string:
         try {
-        	ObjectMapper mapper = new ObjectMapper();
+        	
         	Map<String, String> availability = mapper.readValue(service.getAvailability(), new TypeReference<Map<String, String>>() {});
             response.put("availability", availability);
         } catch (Exception e) {
             response.put("availability", new HashMap<>());
         }
+        
+        response.put("category", service.getCategory());
+
+        // NEW: subcategories (deserialize JSON stored in TEXT column to a Map)
+        try {
+            String subJson = service.getSubcategory();
+            if (subJson == null || subJson.trim().isEmpty()) {
+                response.put("subcategories", new HashMap<>());
+            } else {
+                // deserialize into Map<String, Object> so prices can be numbers
+                Map<String, Object> subMap = mapper.readValue(subJson, new TypeReference<Map<String, Object>>() {});
+                response.put("subcategories", subMap);
+            }
+        } catch (Exception e) {
+            // fallback to empty map on parse error
+            response.put("subcategories", new HashMap<>());
+        }
+        
+        
         return ResponseEntity.ok(response);
     }
     
