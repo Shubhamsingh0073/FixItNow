@@ -11,16 +11,13 @@ const categories = [
   { id: 'appliance', name: 'Appliance Repair' }
 ];
 
-
 const CustomerDashboard = () => {
-  // Location state (address as text)
   const [location, setLocation] = useState('');
   const [isEditingLocation, setIsEditingLocation] = useState(false);
   const [locationInput, setLocationInput] = useState('');
   const [latLng, setLatLng] = useState(null);
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
 
-  // set from backend
   const [serviceProviders, setServiceProviders] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -29,32 +26,25 @@ const CustomerDashboard = () => {
   const [phoneInput, setPhoneInput] = useState('');
   const [connectedProvider, setConnectedProvider] = useState(null);
 
-  // Booking form
   const [showModal, setShowModal] = useState(false);
   const [modalProvider, setModalProvider] = useState(null);
 
   useEffect(() => {
     const fetchProviders = async () => {
       try {
-        // Fetch all providers from backend. Assumes array of provider objects.
         const res = await fetch('http://localhost:8087/users/providers');
         if (!res.ok) throw new Error('Failed to fetch providers');
         const providers = await res.json();
-
-        // If the backend returns a single object, convert it to array:
         const providersArray = Array.isArray(providers) ? providers : [providers];
-
         setServiceProviders(providersArray);
       } catch (error) {
         console.error('Error fetching providers:', error);
         setServiceProviders([]);
       }
     };
-
     fetchProviders();
   }, []);
 
-  // Location function (OpenStreetMap, editable)
   useEffect(() => {
     setIsLoadingLocation(true);
     if (navigator.geolocation) {
@@ -63,8 +53,6 @@ const CustomerDashboard = () => {
           const lat = position.coords.latitude;
           const lng = position.coords.longitude;
           setLatLng({ lat, lng });
-
-          // Fetch address from OpenStreetMap Nominatim
           fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
             .then(response => response.json())
             .then(data => {
@@ -86,23 +74,17 @@ const CustomerDashboard = () => {
       setLocation('Geolocation not supported.');
       setIsLoadingLocation(false);
     }
-    // Only run once on mount
-    // eslint-disable-next-line
   }, []);
 
-  // Filtering providers for Home page search (category logic updated)
   const filteredProviders = serviceProviders.filter(provider => {
-    // Category filtering based on provider name (case-insensitive)
     let matchesCategory = true;
     if (selectedCategory !== 'all') {
-      matchesCategory = provider.name && provider.name.toLowerCase().includes(selectedCategory);
+      matchesCategory = provider.category && provider.category.toLowerCase().includes(selectedCategory);
     }
-    // Search filtering by location/address (case-insensitive)
     const matchesSearch = (provider.location || '').toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
   });
 
-  // Remove connected provider from "other services"
   const otherProviders = connectedProvider
     ? filteredProviders.filter(p => p.id !== connectedProvider.id)
     : filteredProviders;
@@ -123,24 +105,20 @@ const CustomerDashboard = () => {
     alert("Phone number saved!");
   };
 
-  // Edit Location Button
   const handleEditLocation = () => {
     setLocationInput(location);
     setIsEditingLocation(true);
   };
 
-  // Save Location Button
   const handleSaveLocation = () => {
     if (locationInput.trim() === "") {
-    // If empty, do NOT update location, just close edit mode
-    setIsEditingLocation(false);
-    return;
+      setIsEditingLocation(false);
+      return;
     }
     setLocation(locationInput);
     setIsEditingLocation(false);
   };
 
-  // Booking form modal
   const handleSeeDetails = (provider) => {
     setModalProvider(provider);
     setShowModal(true);
@@ -151,104 +129,109 @@ const CustomerDashboard = () => {
     setModalProvider(null);
   };
 
-  // Wide Card for connected provider
   const WideProviderCard = ({ provider, showBookingDate }) => (
-    <div className="customer-wide-card" style={{
-      width: "100%",
-      background: "#fff",
-      borderRadius: "1rem",
-      boxShadow: "0 2px 16px rgba(80,36,143,0.12)",
-      marginBottom: "2rem",
-      padding: "2.1rem 2.8rem",
-      display: "flex",
-      alignItems: "center",
-      gap: "2.8rem",
-      justifyContent: "flex-start"
-    }}>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontWeight: 700, fontSize: "1.37rem", marginBottom: "0.5rem" }}>
-          {provider.name}
+    <div className="customer-wide-card">
+      <div className="wide-card-content">
+        <div className="wide-card-title">{provider.name}</div>
+        <div className="rating">
+          <FaStar className="star-icon" />
+          {provider.rating ? provider.rating : "4.5"}
+          ({provider.reviews ? provider.reviews : "120"} reviews)
         </div>
-        {/* {(provider.rating || provider.reviews) && ( */}
-          <div style={{ marginBottom: "0.4rem", display: "flex", alignItems: "center" }}>
-            <FaStar style={{ color: "#fbbf24", marginRight: "0.25rem" }} />
-            {provider.rating ? provider.rating : "4.5"}
-            ({provider.reviews ? provider.reviews : "120"} reviews)
-          </div>
-        {/* )} */}
-        <div style={{ marginBottom: "0.4rem", display: "flex", alignItems: "center" }}>
-          <FaMapMarkerAlt style={{ marginRight: "0.5em" }} /> 
+        <div className="distance">
+          <FaMapMarkerAlt color="#cf1616ff" className="map-icon" />
           {provider.location}
         </div>
-        <div style={{ marginBottom: "0.4rem", color: "#555" }}>
+        <div className="description">
           <strong>Description:</strong> {provider.description}
         </div>
-        <div style={{ marginBottom: "0.4rem", color: "#555" }}>
-          <strong>Availability:</strong> 
-          {provider.availability?.from ? provider.availability.from : ''} 
+        <div className="availability">
+          <strong>Availability:</strong>
+          {provider.availability?.from ? provider.availability.from : ''}
           {provider.availability?.to ? ` to ${provider.availability.to}` : ''}
         </div>
-        <div style={{ marginBottom: "0.3rem", display: "flex", alignItems: "center" }}>
-          <FaPhone style={{ marginRight: "0.5em" }} /> {provider.phone} &nbsp;
-        </div>
-        <div style={{ marginBottom: "0.5rem", display: "flex", alignItems: "center" }}> 
-          <FaEnvelope style={{ marginRight: "0.5em" }}/> {provider.email}
+        <div className="contact-info">
+          <p><FaPhone /> {provider.phone}</p>
+          <p><FaEnvelope /> {provider.email}</p>
         </div>
         {showBookingDate && (
-          <div style={{ marginTop: "0.5rem", fontWeight: 500, display: "flex", alignItems: "center" }}>
-            <FaCalendarAlt style={{ marginRight: "0.5em" }} />
-            {provider.bookingDate || "2025-10-13"}
+          <div className="booking-date">
+            <FaCalendarAlt /> {provider.bookingDate || "2025-10-13"}
           </div>
         )}
       </div>
     </div>
   );
-  
+
   const ProviderModal = ({ provider, onClose }) => {
     if (!provider) return null;
     return (
       <div className="modal-overlay" onClick={onClose}>
         <div className="modal-content" onClick={e => e.stopPropagation()}>
-          <button style={{float: "right"}} onClick={onClose}>×</button>
-          <h2>{provider.name}</h2>
-          <p><FaMapMarkerAlt /> {provider.location}</p>
-          <p><FaPhone /> {provider.phone}</p>
-          <p><FaEnvelope /> {provider.email}</p>
-          <p><strong>Description:</strong> {provider.description}</p>
-          <p><strong>Availability:</strong> {provider.availability?.from} to {provider.availability?.to}</p>
-          <p style={{display: "flex", alignItems: "center"}}><FaStar style={{color: "#fbbf24", marginRight: "0.25em"}} />{provider.rating ? provider.rating : "4.5"} ({provider.reviews ? provider.reviews : "120"} reviews)</p>
+          <button className="modal-close-btn" onClick={onClose}>×</button>
+          <h2 className="modal-provider-name">{provider.name}</h2>
+          <div className="modal-provider-details">
+            <div className="modal-detail-row rating-row">
+              <FaStar className="star-icon" />
+              <span className="modal-detail-value">
+                {provider.rating ? provider.rating : "4.5"} ({provider.reviews ? provider.reviews : "120"} reviews)
+              </span>
+            </div> 
+            </div>
+          <div className="modal-contact-row">
+            <p>
+              Contact: 
+              <span className="modal-detail-value">{provider.phone}</span>
+            </p>
+            <p>
+              <FaEnvelope />
+              <span className="modal-detail-value">{provider.email}</span>
+            </p>
+          </div>
+          <div className="modal-provider-details">
+            <div className="modal-location-row">
+              <FaMapMarkerAlt color="#cf1616ff" className="modal-map-icon" />
+              <span className="modal-detail-value">{provider.location}</span>
+            </div>
+            <div className="modal-detail-row">
+              <strong>Description:</strong>
+              <span className="modal-detail-value">{provider.description}</span>
+            </div>
+            <div className="modal-detail-row">
+              <strong>Availability:</strong>
+              <span className="modal-detail-value">
+                {provider.availability?.from} to {provider.availability?.to}
+              </span>
+            </div>
+            
+          </div>
         </div>
       </div>
     );
   };
 
-
-  // Card component for other services
   const ProviderCard = ({ provider, showBookingDate }) => (
     <div className="provider-card">
       <div className="provider-info">
         <h3>{provider.name}</h3>
-        {/* {(provider.rating || provider.reviews) && (
-          <div className="rating">
-            <FaStar /> {provider.rating} ({provider.reviews} reviews)
-          </div>
-        )} */}
-        <div className="rating" style={{ display: "flex", alignItems: "center", marginBottom: "0.4rem" }}>
-          <FaStar style={{ color: "#fbbf24", marginRight: "0.25rem" }} />
-          {provider.rating ? provider.rating : "4.5"} 
+        <div className="rating">
+          <FaStar className="star-icon" />
+          {provider.rating ? provider.rating : "4.5"}
         </div>
-        <p className="distance" style={{ display: "flex", alignItems: "center", gap: "0.5em" }}>
-          <FaMapMarkerAlt /> {provider.location}</p>
-        <p style={{ display: "flex", alignItems: "center", gap: "0.5em" }}>
-          <FaPhone /> {provider.phone}</p>
-        <p style={{ display: "flex", alignItems: "center", gap: "0.5em" }}>
-          <FaEnvelope /> {provider.email}</p>
-        <p className="description">
-          <strong>Description:</strong> {provider.description}</p>
-        <p><strong>Availability:</strong> 
-          {provider.availability?.from ? provider.availability.from : ''} 
-          {provider.availability?.to ? ` to ${provider.availability.to}` : ''}
+        <p className="category-info"><FaTools /> <b>{provider.category}</b></p>
+        <p className="distance">
+          <FaMapMarkerAlt color="#cf1616ff" className="map-icon" /> {
+            (() => {
+              const maxWords = 6;
+              const words = (provider.location || "").split(" ");
+              const truncated = words.slice(0, maxWords).join(" ");
+              return words.length > maxWords ? truncated + "..." : truncated;
+            })()
+          }
         </p>
+        
+        <p className="contact-info"><FaPhone /> {provider.phone}</p>
+        <p className="contact-info"><FaEnvelope /> {provider.email}</p>
         {showBookingDate && (
           <div className="booking-date">
             <FaCalendarAlt /> {provider.bookingDate}
@@ -264,21 +247,17 @@ const CustomerDashboard = () => {
       </button>
     </div>
   );
-  
 
   useEffect(() => {
-    // Get current user from localStorage
     const userData = JSON.parse(localStorage.getItem('currentUser'));
     if (userData) {
       setCurrentUser(userData);
       setPhoneInput(userData.phone || '');
     }
-    // Providers are fetched from backend in first useEffect
   }, []);
 
   return (
     <div className="dashboard-root">
-      {/* Side Panel */}
       <div className="sidebar">
         <div className="sidebar-title">FixItNow</div>
         <div className="sidebar-subtitle">CUSTOMER</div>
@@ -303,54 +282,24 @@ const CustomerDashboard = () => {
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="dashboard-main">
-        {/* Home */}
         {activePage === 'home' && (
           <div>
             <div className="dashboard-header">
               <h1 className="dashboard-header-bold-white">Find Services Near You</h1>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  width: "100%",
-                  margin: "1.4em 0 1.2em 0"
-                }}
-              >
-                <FaMapMarkerAlt style={{ fontSize: "1.2em", marginRight: "0.7em", color: "#222" }} />
+              <div className="location-row">
+                <FaMapMarkerAlt className="map-icon location-icon" />
                 {!isEditingLocation ? (
                   <>
-                    <div style={{
-                      flex: 1,
-                      textAlign: "center",
-                      fontWeight: 600,
-                      fontSize: "1em",
-                      color: "#f0f0f0ea"
-                    }}>
+                    <div className="location-text">
                       {isLoadingLocation ? "Fetching location..." : location}
                     </div>
                     <button
                       className="edit-location-btn"
-                      style={{
-                        width: "38px",
-                        height: "38px",
-                        minWidth: "38px",
-                        maxWidth: "38px",
-                        border: "none",
-                        borderRadius: "10px",
-                        marginLeft: "1em",
-                        background: "#7c4dff",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        cursor: "pointer"
-                      }}
                       onClick={handleEditLocation}
                       title="Edit address"
                     >
-                      <FaEdit style={{ fontSize: "1.18em", color: "#fff" }} />
+                      <FaEdit />
                     </button>
                   </>
                 ) : (
@@ -360,56 +309,21 @@ const CustomerDashboard = () => {
                       value={locationInput}
                       onChange={e => setLocationInput(e.target.value)}
                       placeholder="Enter your address"
-                      style={{
-                        flex: 1,
-                        textAlign: "center",
-                        padding: "0.5em",
-                        borderRadius: "0.5em",
-                        fontSize: "1em",
-                        marginRight: "1em",
-                        marginLeft: "0.4em"
-                      }}
+                      className="location-input"
                     />
                     <button
-                      className="edit-location-btn"
-                      style={{
-                        width: "38px",
-                        height: "38px",
-                        minWidth: "38px",
-                        maxWidth: "38px",
-                        border: "none",
-                        borderRadius: "10px",
-                        background: "#4fd1c5",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        marginRight: "0.5em",
-                        cursor: "pointer"
-                      }}
+                      className="edit-location-btn save-btn"
                       onClick={handleSaveLocation}
                       title="Save address"
                     >
-                      <FaCheck style={{ fontSize: "1.18em", color: "#fff" }} />
+                      <FaCheck />
                     </button>
                     <button
-                      className="edit-location-btn"
-                      style={{
-                        width: "38px",
-                        height: "38px",
-                        minWidth: "38px",
-                        maxWidth: "38px",
-                        border: "none",
-                        borderRadius: "10px",
-                        background: "#e53e3e",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        cursor: "pointer"
-                      }}
+                      className="edit-location-btn cancel-btn"
                       onClick={() => setIsEditingLocation(false)}
                       title="Cancel"
                     >
-                      <FaTimes style={{ fontSize: "1.18em", color: "#fff" }} />
+                      <FaTimes />
                     </button>
                   </>
                 )}
@@ -420,7 +334,7 @@ const CustomerDashboard = () => {
                 <FaSearch />
                 <input
                   type="text"
-                  placeholder="Search by location (address)..."
+                  placeholder="Search by location..."
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                 />
@@ -438,11 +352,9 @@ const CustomerDashboard = () => {
                 ))}
               </div>
             </div>
-            {/* Connected wide card */}
             {connectedProvider && (
               <WideProviderCard provider={connectedProvider} />
             )}
-            {/* Other services */}
             <div>
               {connectedProvider && otherProviders.length > 0 && (
                 <h2 className="dashboard-header-bold-white" style={{ fontSize: '1.25rem', marginBottom: '1rem' }}>Other Services</h2>
@@ -456,7 +368,6 @@ const CustomerDashboard = () => {
           </div>
         )}
 
-        {/* Bookings */}
         {activePage === 'bookings' && (
           <div className="bookings-page">
             <h2 className="dashboard-header-bold-white">Current Bookings</h2>
@@ -464,28 +375,24 @@ const CustomerDashboard = () => {
               {connectedProvider ? (
                 <WideProviderCard provider={connectedProvider} showBookingDate />
               ) : (
-                <div style={{ color: '#aaa', fontSize: '1.1rem', fontWeight: '500' }}>
+                <div className="no-bookings-text">
                   No current bookings.
                 </div>
               )}
             </div>
             <h2 className="dashboard-header-bold-white">Past Bookings</h2>
             <div className="providers-grid">
-              <div style={{ color: '#aaa', fontSize: '1.1rem', fontWeight: '500' }}>
+              <div className="no-bookings-text">
                 No past bookings.
               </div>
             </div>
           </div>
         )}
 
-
         {showModal && <ProviderModal provider={modalProvider} onClose={handleCloseModal} />}
 
-
-        {/* Profile */}
         {activePage === 'profile' && (
           <div className="profile-page">
-            {/* Section 1: Profile Info */}
             <div className="profile-info-box">
               <div className="profile-info-left">
                 <FaUserCircle size={90} />
@@ -506,7 +413,6 @@ const CustomerDashboard = () => {
                 </div>
               </div>
             </div>
-            {/* Section 2: Actions */}
             <div className="profile-actions-box">
               <button className="profile-wide-action-btn">
                 <FaQuestionCircle className="profile-action-icon" /> Help

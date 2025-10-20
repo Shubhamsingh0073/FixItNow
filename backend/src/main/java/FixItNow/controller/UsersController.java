@@ -188,22 +188,51 @@ public class UsersController {
             profile.put("email", user.getEmail());
 
             // Fetch their service details (assuming one service per provider)
+            ObjectMapper mapper = new ObjectMapper();
+            
             List<Services> servicesList = servicesRepository.findByProvider(user);
-            Services service = (servicesList != null && !servicesList.isEmpty()) ? servicesList.get(0) : null;
+            if (servicesList != null && !servicesList.isEmpty()) {
+                Services service = servicesList.get(0);
 
-            if (service != null) {
-                profile.put("description", service.getDescription());
+                // description
+                profile.put("description", service.getDescription() == null ? "" : service.getDescription());
+
+                // availability (deserialize JSON string into a Map)
                 try {
-                    ObjectMapper mapper = new ObjectMapper();
-                    Map<String, String> availability =
-                        mapper.readValue(service.getAvailability(), new TypeReference<Map<String, String>>() {});
-                    profile.put("availability", availability);
+                    String availJson = service.getAvailability();
+                    if (availJson == null || availJson.trim().isEmpty()) {
+                        profile.put("availability", new HashMap<String, Object>());
+                    } else {
+                        Map<String, Object> availability = mapper.readValue(availJson, new TypeReference<Map<String, Object>>() {});
+                        profile.put("availability", availability);
+                    }
                 } catch (Exception e) {
-                    profile.put("availability", new HashMap<>());
+                    // on parse error, return empty map
+                    profile.put("availability", new HashMap<String, Object>());
+                }
+
+                // category (plain string)
+                profile.put("category", service.getCategory() == null ? "" : service.getCategory());
+
+                // subcategories: stored as JSON string in TEXT column; deserialize to Map
+                try {
+                    String subJson = service.getSubcategory();
+                    if (subJson == null || subJson.trim().isEmpty()) {
+                        profile.put("subcategory", new HashMap<String, Object>());
+                    } else {
+                        Map<String, Object> subMap = mapper.readValue(subJson, new TypeReference<Map<String, Object>>() {});
+                        profile.put("subcategory", subMap);
+                    }
+                } catch (Exception e) {
+                    // on parse error, fallback to empty map
+                    profile.put("subcategory", new HashMap<String, Object>());
                 }
             } else {
+                // no service found for provider: return empty/default values for all four fields
                 profile.put("description", "");
-                profile.put("availability", new HashMap<>());
+                profile.put("availability", new HashMap<String, Object>());
+                profile.put("category", "");
+                profile.put("subcategory", new HashMap<String, Object>());
             }
 
             responseList.add(profile);
