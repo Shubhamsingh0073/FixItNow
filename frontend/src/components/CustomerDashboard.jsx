@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { FaMapMarkerAlt, FaSearch, FaTools, FaStar, FaPhone, FaEnvelope, FaUser, FaHome, FaCalendarAlt, FaUserCircle, FaSignOutAlt, FaQuestionCircle, FaRegComments, FaRegThumbsUp, FaEdit, FaTimes, FaCheck, FaToolbox } from 'react-icons/fa';
 import './CustomerDashboard.css';
 
@@ -26,6 +26,7 @@ const CustomerDashboard = () => {
   const [phoneInput, setPhoneInput] = useState('');
   const [connectedProvider, setConnectedProvider] = useState(null);
 
+  const [modalScrollTop, setModalScrollTop] = useState(0);
   const [selectedServices, setSelectedServices] = useState({});
   const [showModal, setShowModal] = useState(false);
   const [modalProvider, setModalProvider] = useState(null);
@@ -164,7 +165,22 @@ const CustomerDashboard = () => {
     </div>
   );
 
-  const ProviderModal = ({ provider, onClose }) => {
+  const ProviderModal = ({ provider, onClose, selectedServices, setSelectedServices, modalScrollTop, setModalScrollTop }) => {
+    const scrollRef = useRef();
+    useEffect(() => {
+      if (scrollRef.current) {
+        // Give the browser a moment to render before restoring scroll
+        setTimeout(() => {
+          scrollRef.current.scrollTop = modalScrollTop;
+        }, 0);
+      }
+    }, [selectedServices, modalScrollTop, provider]);
+    const handleCheckboxChange = (name, checked) => {
+      if (scrollRef.current) {
+        setModalScrollTop(scrollRef.current.scrollTop);
+      }
+      setSelectedServices(prev => ({ ...prev, [name]: checked }));
+    };
     if (!provider) return null;
     return (
       <div className="modal-overlay" onClick={onClose}>
@@ -189,15 +205,16 @@ const CustomerDashboard = () => {
                 <FaEnvelope />
                 <span className="modal-detail-value">{provider.email}</span>
               </p>
-            </div>
+          </div>
+          <div className="modal-content-scroll" ref={scrollRef}>
             <div className="modal-provider-details">
               <div className="modal-location-row">
                 <FaMapMarkerAlt color="#cf1616ff" className="modal-map-icon" />
                 <span className="modal-detail-value">{provider.location}</span>
               </div>
               <div className="modal-detail-row">
-                <strong>Description:</strong>
-                <span className="modal-detail-value">{provider.description}</span>
+                
+                <span className="modal-detail-value"><strong>Description:</strong> {provider.description}</span>
               </div>
               <div className="modal-detail-row">
                 <strong>Availability:</strong>
@@ -215,7 +232,7 @@ const CustomerDashboard = () => {
                       type="checkbox"
                       checked={!!selectedServices[name]}
                       onChange={e =>
-                        setSelectedServices(prev => ({ ...prev, [name]: e.target.checked }))
+                        handleCheckboxChange(name, e.target.checked)
                       }
                     />
                     <span className="modal-subcategory-name">{name}</span>
@@ -234,6 +251,8 @@ const CustomerDashboard = () => {
                   .reduce((sum, [name]) => sum + (provider.subcategory[name] || 0), 0)}
                 </span>
               </div>
+            </div>
+          </div>
               <button
                 className="connect-button"
                 onClick={() => {
@@ -244,10 +263,9 @@ const CustomerDashboard = () => {
               >
                 {provider.available === false ? 'Currently Unavailable' : 'Connect Now'}
               </button>
-            </div>
-          </div>
+            
         </div>
-      
+      </div>
     );
   };
 
@@ -430,8 +448,16 @@ const CustomerDashboard = () => {
           </div>
         )}
 
-        {showModal && <ProviderModal provider={modalProvider} onClose={handleCloseModal} />}
-
+        {showModal && (
+          <ProviderModal
+            provider={modalProvider}
+            onClose={handleCloseModal}
+            selectedServices={selectedServices}
+            setSelectedServices={setSelectedServices}
+            modalScrollTop={modalScrollTop}
+            setModalScrollTop={setModalScrollTop}
+          />
+        )}
         {activePage === 'profile' && (
           <div className="profile-page">
             <div className="profile-info-box">
