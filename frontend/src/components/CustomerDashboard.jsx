@@ -1,6 +1,21 @@
-import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { FaMapMarkerAlt, FaSearch, FaTools, FaStar, FaPhone, FaEnvelope, FaUser, FaHome, FaCalendarAlt, FaUserCircle, FaSignOutAlt, FaQuestionCircle, FaRegComments, FaRegThumbsUp, FaEdit, FaTimes, FaCheck, FaToolbox } from 'react-icons/fa';
 import './CustomerDashboard.css';
+
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: markerIcon2x,
+  iconUrl: markerIcon,
+  shadowUrl: markerShadow,
+});
+
 
 const categories = [
   { id: 'all', name: 'All Services' },
@@ -10,6 +25,16 @@ const categories = [
   { id: 'cleaning', name: 'Cleaning' },
   { id: 'appliance', name: 'Appliance Repair' }
 ];
+
+
+async function geocodeAddress(address) {
+  const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`);
+  const data = await res.json();
+  if (data && data.length > 0) {
+    return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+  }
+  return null;
+}
 
 const CustomerDashboard = () => {
   const [location, setLocation] = useState('');
@@ -76,6 +101,35 @@ const CustomerDashboard = () => {
       setLocation('Geolocation not supported.');
       setIsLoadingLocation(false);
     }
+  }, []);
+
+
+  useEffect(() => {
+    async function fetchAndGeocodeProviders() {
+      try {
+        const res = await fetch('http://localhost:8087/users/providers');
+        const providers = await res.json();
+        const providersArray = Array.isArray(providers) ? providers : [providers];
+
+        // Geocode each provider's location field
+        const providersWithCoords = await Promise.all(
+          providersArray.map(async (provider) => {
+            const coords = provider.location
+              ? await geocodeAddress(provider.location)
+              : null;
+            return coords
+              ? { ...provider, ...coords }
+              : provider;
+          })
+        );
+        setServiceProviders(providersWithCoords);
+      } catch (error) {
+        console.error('Error fetching providers:', error);
+        setServiceProviders([]);
+      }
+    }
+
+    fetchAndGeocodeProviders();
   }, []);
 
   const filteredProviders = serviceProviders.filter(provider => {
@@ -398,6 +452,31 @@ const CustomerDashboard = () => {
                   onChange={e => setSearchQuery(e.target.value)}
                 />
               </div>
+              <div style={{ margin: "2em 0" }}>
+                <MapContainer
+                  center={[
+                    filteredProviders[0]?.lat || 20, 
+                    filteredProviders[0]?.lng || 80
+                  ]}
+                  zoom={12}
+                  style={{ height: '400px', width: '100%', borderRadius: '1em' }}
+                >
+                  <TileLayer
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    attribution="&copy; OpenStreetMap contributors"
+                  />
+                  {filteredProviders.map((provider) =>
+                    provider.lat && provider.lng ? (
+                      <Marker key={provider.id} position={[provider.lat, provider.lng]}>
+                        <Popup>
+                          <strong>{provider.name}</strong><br />
+                          {provider.location}
+                        </Popup>
+                      </Marker>
+                    ) : null
+                  )}
+                </MapContainer>
+              </div>
               <div className="categories no-scroll">
                 {categories.map(category => (
                   <button
@@ -419,7 +498,7 @@ const CustomerDashboard = () => {
                 <h2 className="dashboard-header-bold-white" style={{ fontSize: '1.25rem', marginBottom: '1rem' }}>Other Services</h2>
               )}
               <div className="providers-grid">
-                {otherProviders.map(provider => (
+                {filteredProviders.map(provider => (
                   <ProviderCard key={provider.id} provider={provider} />
                 ))}
               </div>
