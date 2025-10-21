@@ -242,6 +242,7 @@ const CustomerDashboard = () => {
           <button className="modal-close-btn" onClick={onClose}>×</button>
           
             <h2 className="modal-provider-name">{provider.name}</h2>
+            
             <div className="modal-provider-details">
               <div className="modal-detail-row rating-row">
                 <FaStar className="star-icon" />
@@ -458,7 +459,7 @@ const CustomerDashboard = () => {
                     filteredProviders[0]?.lat || 20, 
                     filteredProviders[0]?.lng || 80
                   ]}
-                  zoom={12}
+                  zoom={4}
                   style={{ height: '400px', width: '100%', borderRadius: '1em' }}
                 >
                   <TileLayer
