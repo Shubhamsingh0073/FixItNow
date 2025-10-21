@@ -170,46 +170,46 @@ const CustomerDashboard = () => {
       <div className="modal-overlay" onClick={onClose}>
         <div className="modal-content" onClick={e => e.stopPropagation()}>
           <button className="modal-close-btn" onClick={onClose}>×</button>
-          <div className="modal-content-main">
-          <h2 className="modal-provider-name">{provider.name}</h2>
-          <div className="modal-provider-details">
-            <div className="modal-detail-row rating-row">
-              <FaStar className="star-icon" />
-              <span className="modal-detail-value">
+          
+            <h2 className="modal-provider-name">{provider.name}</h2>
+            <div className="modal-provider-details">
+              <div className="modal-detail-row rating-row">
+                <FaStar className="star-icon" />
+                <span className="modal-detail-value">
                 {provider.rating ? provider.rating : "4.5"} ({provider.reviews ? provider.reviews : "120"} reviews)
-              </span>
-            </div> 
+                </span>
+              </div> 
             </div>
-          <div className="modal-contact-row">
-            <p>
-              Contact: 
-              <span className="modal-detail-value">{provider.phone}</span>
-            </p>
-            <p>
-              <FaEnvelope />
-              <span className="modal-detail-value">{provider.email}</span>
-            </p>
-          </div>
-          <div className="modal-provider-details">
-            <div className="modal-location-row">
-              <FaMapMarkerAlt color="#cf1616ff" className="modal-map-icon" />
-              <span className="modal-detail-value">{provider.location}</span>
+            <div className="modal-contact-row">
+              <p>
+                Contact: 
+                <span className="modal-detail-value">{provider.phone}</span>
+              </p>
+              <p>
+                <FaEnvelope />
+                <span className="modal-detail-value">{provider.email}</span>
+              </p>
             </div>
-            <div className="modal-detail-row">
-              <strong>Description:</strong>
-              <span className="modal-detail-value">{provider.description}</span>
-            </div>
-            <div className="modal-detail-row">
-              <strong>Availability:</strong>
-              <span className="modal-detail-value">
+            <div className="modal-provider-details">
+              <div className="modal-location-row">
+                <FaMapMarkerAlt color="#cf1616ff" className="modal-map-icon" />
+                <span className="modal-detail-value">{provider.location}</span>
+              </div>
+              <div className="modal-detail-row">
+                <strong>Description:</strong>
+                <span className="modal-detail-value">{provider.description}</span>
+              </div>
+              <div className="modal-detail-row">
+                <strong>Availability:</strong>
+                <span className="modal-detail-value">
                 {provider.availability?.from} to {provider.availability?.to}
-              </span>
-            </div>
-            {provider.subcategory && (
-            <div className="modal-subcategories">
-              <strong>Services:</strong>
-              <div className="modal-subcategory-list">
-                {Object.entries(provider.subcategory).map(([name, price]) => (
+                </span>
+              </div>
+              {provider.subcategory && (
+              <div className="modal-subcategories">
+                <strong>Services:</strong>
+                <div className="modal-subcategory-list">
+                  {Object.entries(provider.subcategory).map(([name, price]) => (
                   <label key={name} className="modal-subcategory-row">
                     <input
                       type="checkbox"
@@ -221,30 +221,30 @@ const CustomerDashboard = () => {
                     <span className="modal-subcategory-name">{name}</span>
                     <span className="modal-subcategory-price">₹ {price}</span>
                   </label>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
-            <hr className="modal-services-divider" />
-            <div className="modal-services-total-row">
-              <span className="modal-services-total-label"><strong>Total Price :</strong></span>
-              <span className="modal-services-total-value">
+              )}
+              <hr className="modal-services-divider" />
+              <div className="modal-services-total-row">
+                <span className="modal-services-total-label"><strong>Total Price :</strong></span>
+                <span className="modal-services-total-value">
                 ₹{Object.entries(selectedServices)
                   .filter(([name, checked]) => checked)
                   .reduce((sum, [name]) => sum + (provider.subcategory[name] || 0), 0)}
-              </span>
-            </div>
-            <button
-              className="connect-button"
-              onClick={() => handleConnect(provider)}
-              disabled={provider.available === false}
-            >
-              {provider.available === false ? 'Currently Unavailable' : 'Connect Now'}
+                </span>
+              </div>
+              <button
+                className="connect-button"
+                onClick={() => handleConnect(provider)}
+                disabled={provider.available === false}
+              >
+                {provider.available === false ? 'Currently Unavailable' : 'Connect Now'}
               </button>
             </div>
           </div>
         </div>
-      </div>
+      
     );
   };
 
