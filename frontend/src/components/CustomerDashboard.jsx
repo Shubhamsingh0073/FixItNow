@@ -236,7 +236,10 @@ const CustomerDashboard = () => {
               </div>
               <button
                 className="connect-button"
-                onClick={() => handleConnect(provider)}
+                onClick={() => {
+                  handleConnect(provider)
+                  onClose();
+                }}
                 disabled={provider.available === false}
               >
                 {provider.available === false ? 'Currently Unavailable' : 'Connect Now'}
@@ -390,9 +393,9 @@ const CustomerDashboard = () => {
                 ))}
               </div>
             </div>
-            {connectedProvider && (
-              <WideProviderCard provider={connectedProvider} />
-            )}
+            {/*{connectedProvider && (*/}
+              {/*<WideProviderCard provider={connectedProvider} />*/}
+            {/*)*/}
             <div>
               {connectedProvider && otherProviders.length > 0 && (
                 <h2 className="dashboard-header-bold-white" style={{ fontSize: '1.25rem', marginBottom: '1rem' }}>Other Services</h2>
