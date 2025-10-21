@@ -221,7 +221,7 @@
 }
 
 .connect-button {
-  margin-top: auto;
+  margin-top: 1rem;
   width: 100%;
   padding: 0.6rem;
   background: linear-gradient(135deg, #6b46c1, #2b6cb0);
@@ -642,15 +642,23 @@
 }
 
 .modal-content {
+  display: flex;
+  flex-direction: column;
   background: #fff;
   padding: 2rem 2.5rem;
   border-radius: 1rem;
-  width: 650px;
+  width: 600px;
   min-height: 700px;
-  max-height: 90vw;
+  height: 100%;
   
   position: relative;
   box-shadow: 0 4px 24px rgba(80, 36, 143, 0.18);
+}
+
+.modal-content-main {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .modal-close-btn {
@@ -681,7 +689,7 @@
   display: flex;
   align-items: flex-start;
   gap: 0.5em;
-  font-size: 1.07rem;
+  font-size: 0.95rem;
   margin-top: 0.5rem;
   margin-bottom: 1.2rem;
   color: #1b1919;
@@ -726,3 +734,56 @@
   color: #fbbf24;
   font-weight: 600;
 }
+
+/* subcategories */
+.modal-subcategories {
+  margin: 1em 0;
+  font-size: 1.07rem;
+}
+
+.modal-subcategory-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7em;
+  margin-top: 0.5em;
+}
+
+.modal-subcategory-row {
+  display: flex;
+  align-items: center;
+  gap: 1em;
+  font-size: 1.04em;
+}
+
+.modal-subcategory-name {
+  flex: 1;
+  margin-left: 0.6em;
+  font-size: 1rem;
+}
+
+.modal-subcategory-price {
+  color: #2d3748;
+  font-weight: 500;
+  margin-left: 1em;
+  font-size: 1rem;
+}
+
+/*total*/
+.modal-services-divider {
+  border: none;
+  border-top: 1px solid #d4d4d4;
+  margin: 0.3em 0 0.3em 0;
+}
+
+.modal-services-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+  color: #2d3748;
+  font-size: 1.05em;
+  margin-top: 0em;
+  padding-right: 2px;
+  /* optional: adjust for right edge alignment */
+}
+

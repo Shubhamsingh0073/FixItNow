@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FaMapMarkerAlt, FaSearch, FaTools, FaStar, FaPhone, FaEnvelope, FaUser, FaHome, FaCalendarAlt, FaUserCircle, FaSignOutAlt, FaQuestionCircle, FaRegComments, FaRegThumbsUp, FaEdit, FaTimes, FaCheck } from 'react-icons/fa';
+import { FaMapMarkerAlt, FaSearch, FaTools, FaStar, FaPhone, FaEnvelope, FaUser, FaHome, FaCalendarAlt, FaUserCircle, FaSignOutAlt, FaQuestionCircle, FaRegComments, FaRegThumbsUp, FaEdit, FaTimes, FaCheck, FaToolbox } from 'react-icons/fa';
 import './CustomerDashboard.css';
 
 const categories = [
@@ -26,6 +26,7 @@ const CustomerDashboard = () => {
   const [phoneInput, setPhoneInput] = useState('');
   const [connectedProvider, setConnectedProvider] = useState(null);
 
+  const [selectedServices, setSelectedServices] = useState({});
   const [showModal, setShowModal] = useState(false);
   const [modalProvider, setModalProvider] = useState(null);
 
@@ -169,6 +170,7 @@ const CustomerDashboard = () => {
       <div className="modal-overlay" onClick={onClose}>
         <div className="modal-content" onClick={e => e.stopPropagation()}>
           <button className="modal-close-btn" onClick={onClose}>×</button>
+          <div className="modal-content-main">
           <h2 className="modal-provider-name">{provider.name}</h2>
           <div className="modal-provider-details">
             <div className="modal-detail-row rating-row">
@@ -203,7 +205,43 @@ const CustomerDashboard = () => {
                 {provider.availability?.from} to {provider.availability?.to}
               </span>
             </div>
-            
+            {provider.subcategory && (
+            <div className="modal-subcategories">
+              <strong>Services:</strong>
+              <div className="modal-subcategory-list">
+                {Object.entries(provider.subcategory).map(([name, price]) => (
+                  <label key={name} className="modal-subcategory-row">
+                    <input
+                      type="checkbox"
+                      checked={!!selectedServices[name]}
+                      onChange={e =>
+                        setSelectedServices(prev => ({ ...prev, [name]: e.target.checked }))
+                      }
+                    />
+                    <span className="modal-subcategory-name">{name}</span>
+                    <span className="modal-subcategory-price">₹ {price}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+            <hr className="modal-services-divider" />
+            <div className="modal-services-total-row">
+              <span className="modal-services-total-label"><strong>Total Price :</strong></span>
+              <span className="modal-services-total-value">
+                ₹{Object.entries(selectedServices)
+                  .filter(([name, checked]) => checked)
+                  .reduce((sum, [name]) => sum + (provider.subcategory[name] || 0), 0)}
+              </span>
+            </div>
+            <button
+              className="connect-button"
+              onClick={() => handleConnect(provider)}
+              disabled={provider.available === false}
+            >
+              {provider.available === false ? 'Currently Unavailable' : 'Connect Now'}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -213,12 +251,12 @@ const CustomerDashboard = () => {
   const ProviderCard = ({ provider, showBookingDate }) => (
     <div className="provider-card">
       <div className="provider-info">
-        <h3>{provider.name}</h3>
+        <h3><b>{provider.name}</b></h3>
         <div className="rating">
           <FaStar className="star-icon" />
-          {provider.rating ? provider.rating : "4.5"}
+          {provider.rating ? provider.rating : "4.5"} ({provider.reviews ? provider.reviews : "120"} reviews)
         </div>
-        <p className="category-info"><FaTools /> <b>{provider.category}</b></p>
+        <p className="category-info"><FaToolbox /> <b>{provider.category}</b></p>
         <p className="distance">
           <FaMapMarkerAlt color="#cf1616ff" className="map-icon" /> {
             (() => {
