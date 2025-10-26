@@ -136,6 +136,7 @@
 
 .search-bar input {
   width: 100%;
+  height: 50px;
   padding: 1rem 1rem 1rem 3rem;
   border: 2px solid #e2e8f0;
   border-radius: 1rem;
@@ -201,12 +202,24 @@
   border-color: #6b46c1;
 }
 
+/* Ensure grid rows stretch so cards have equal height and the button can sit at the bottom */
 .providers-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
   gap: 1.3rem;
+
+  /* ensure equal-height rows so children stretch */
+  grid-auto-rows: minmax(0, 1fr);
+  align-items: stretch;
 }
 
+/* Ensure direct children stretch (safeguard for some browsers) */
+.providers-grid > * {
+  align-self: stretch;
+  display: block;
+}
+
+/* Card */
 .provider-card {
   background: white;
   border-radius: 1rem;
@@ -217,11 +230,26 @@
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
+  /* allow flex children to size correctly */
   color: #000102;
+}
+
+/* Make provider-info occupy available vertical space so the button (with margin-top:auto) is pinned to the bottom */
+.provider-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-bottom: 1.2rem;
+  flex: 1;
+  /* ADDED: stretch to fill available space */
+  min-height: 0;
+  /* important for flex children inside grid items */
 }
 
 .connect-button {
   margin-top: auto;
+  /* ensures the button is pushed to the bottom of the card */
   width: 100%;
   padding: 0.6rem;
   background: linear-gradient(135deg, #6b46c1, #2b6cb0);
@@ -252,13 +280,6 @@
   font-size: 1.17rem;
   color: #2d3748;
   margin-bottom: 0.5rem;
-}
-
-.provider-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  margin-bottom: 1.2rem;
 }
 
 .rating {
@@ -295,10 +316,10 @@
   color: #2d3748;
   margin-bottom: 1rem;
   line-height: 1.5;
-  font-size: 0;
+  /* kept original zero font-size removed */
 }
 
-.category-info{
+.category-info {
   margin-top: 0.5rem;
   margin-bottom: 0.5rem;
   display: flex;
@@ -626,169 +647,3 @@
     padding: 1.2rem 0.8rem;
   }
 }
-
-/* booking form */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.4);
-  z-index: 999;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.modal-content {
-  display: flex;
-  flex-direction: column;
-  background: #fff;
-  padding: 2rem 2.5rem;
-  border-radius: 1rem;
-  width: 600px;
-  min-height: 300px;
-  max-height: 95vh;
-  
-  position: relative;
-  box-shadow: 0 4px 24px rgba(80, 36, 143, 0.18);
-}
-
-.modal-content-scroll {
-  max-height: 55vh;
-  overflow-y: auto;
-  padding-bottom: 2em;
-  flex: 1 1 auto;
-  /* Optional: If you want the "Connect Now" button to always be visible at the bottom,
-     add padding-bottom to this div or keep the button outside this div. */
-}
-
-
-.modal-close-btn {
-  background: none;
-  border: none;
-  font-size: 2rem;
-  color: #6b46c1;
-  cursor: pointer;
-  position: absolute;
-  right: 1.2rem;
-  top: 1.2rem;
-}
-
-.modal-provider-name {
-  text-align: left;
-  font-size: 2rem;
-  font-weight: bold;
-  margin-bottom: 1rem;
-}
-
-.modal-provider-details {
-  display: flex;
-  flex-direction: column;
-  gap: 0.7rem;
-}
-
-.modal-location-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5em;
-  font-size: 0.95rem;
-  margin-top: 0.5rem;
-  margin-bottom: 1.2rem;
-  color: #1b1919;
-}
-
-.modal-map-icon {
-  flex-shrink: 0;
-  margin-right: 0.3em;
-  margin-top: 0.2em ;
-  /* optional: adjust if you want it even more "top" */
-  font-size: 1.15em;
-  /* your preferred icon size */
-  color: #e53e3e;
-  /* or your preferred icon color */
-}
-
-.modal-contact-row {
-  display: flex;
-  flex-direction: column;
-  font-size: 0.95rem;
-  color: #7c7b7b;
-  margin-top: 1rem;
-  margin-bottom: 1.2rem;
-}
-
-.modal-contact-row p {
-  display: flex;
-  align-items: center;
-  gap: 0.5em;
-  margin: 0;
-}
-
-.modal-detail-row {
-  display: flex;
-  align-items: center;
-  gap: 0.7em;
-  font-size: 1.07rem;
-  color: #1b1919;
-}
-
-.rating-row {
-  color: #fbbf24;
-  font-weight: 600;
-}
-
-/* subcategories */
-.modal-subcategories {
-  margin: 1em 0;
-  font-size: 1.07rem;
-}
-
-.modal-subcategory-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.7em;
-  margin-top: 0.5em;
-}
-
-.modal-subcategory-row {
-  display: flex;
-  align-items: center;
-  gap: 1em;
-  font-size: 1.04em;
-}
-
-.modal-subcategory-name {
-  flex: 1;
-  margin-left: 0.6em;
-  font-size: 1rem;
-}
-
-.modal-subcategory-price {
-  color: #2d3748;
-  font-weight: 500;
-  margin-left: 1em;
-  font-size: 1rem;
-}
-
-/*total*/
-.modal-services-divider {
-  border: none;
-  border-top: 1px solid #d4d4d4;
-  margin: 0.3em 0 0.3em 0;
-}
-
-.modal-services-total-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-weight: 600;
-  color: #2d3748;
-  font-size: 1.05em;
-  margin-top: 0em;
-  margin-bottom: 2em;
-  padding-right: 2px;
-  /* optional: adjust for right edge alignment */
-}
-

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FaMapMarkerAlt, FaSearch, FaTools, FaStar, FaPhone, FaEnvelope, FaUser, FaHome, FaCalendarAlt, FaUserCircle, FaSignOutAlt, FaQuestionCircle, FaRegComments, FaRegThumbsUp, FaEdit, FaTimes, FaCheck, FaToolbox } from 'react-icons/fa';
 import './CustomerDashboard.css';
+import ProviderModal from "./ProviderModal";
 
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -72,6 +73,8 @@ const CustomerDashboard = () => {
     fetchProviders();
   }, []);
 
+
+  // Get geolocation and address using OpenStreetMap Nominatim
   useEffect(() => {
     setIsLoadingLocation(true);
     if (navigator.geolocation) {
@@ -145,10 +148,13 @@ const CustomerDashboard = () => {
     ? filteredProviders.filter(p => p.id !== connectedProvider.id)
     : filteredProviders;
 
-  const handleConnect = (provider) => {
-    setConnectedProvider(provider);
-    setActivePage('home');
-  };
+
+const handleConnect = (provider, bookingDate, selectedServicesFromModal) => {
+  const providerWithBooking = { ...provider, bookingDate };
+  setConnectedProvider(providerWithBooking);
+  setSelectedServices(selectedServicesFromModal || {});
+  setActivePage('home');
+};
 
   const handleLogout = () => {
     localStorage.removeItem('currentUser');
@@ -161,18 +167,50 @@ const CustomerDashboard = () => {
     alert("Phone number saved!");
   };
 
+  const saveLocationToBackend = async (locationText) => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      alert('No token found. Please login.');
+      return;
+    }
+    try {
+      const response = await fetch('http://localhost:8087/users/me/location', {
+        method: 'PUT', // or POST if your backend expects it
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ location: locationText }),
+      });
+      if (!response.ok) throw new Error('Failed to save location');
+      // optionally show a success message here
+    } catch (error) {
+      alert('Location update failed: ' + error.message);
+    }
+  };
+
+
   const handleEditLocation = () => {
     setLocationInput(location);
     setIsEditingLocation(true);
   };
 
-  const handleSaveLocation = () => {
-    if (locationInput.trim() === "") {
+   const handleSaveLocation = () => {
+    const trimmed = locationInput.trim();
+    if (trimmed === '') {
       setIsEditingLocation(false);
       return;
     }
-    setLocation(locationInput);
+
+    // update UI immediately
+    setLocation(trimmed);
     setIsEditingLocation(false);
+
+    // save to backend like your old code (no optimistic-revert logic)
+    saveLocationToBackend(trimmed).catch(err => {
+      console.error('Failed to save location', err);
+      alert('Failed to save location. Please try again.');
+    });
   };
 
   const handleSeeDetails = (provider) => {
@@ -186,143 +224,44 @@ const CustomerDashboard = () => {
   };
 
   const WideProviderCard = ({ provider, showBookingDate }) => (
-    <div className="customer-wide-card">
-      <div className="wide-card-content">
-        <div className="wide-card-title">{provider.name}</div>
+    <div className="provider-card">
+      <div className="provider-info">
+        <h3><b>{provider.name}</b></h3>
         <div className="rating">
           <FaStar className="star-icon" />
-          {provider.rating ? provider.rating : "4.5"}
-          ({provider.reviews ? provider.reviews : "120"} reviews)
+          {provider.rating ? provider.rating : "4.5"} ({provider.reviews ? provider.reviews : "120"} reviews)
         </div>
-        <div className="distance">
-          <FaMapMarkerAlt color="#cf1616ff" className="map-icon" />
-          {provider.location}
-        </div>
-        <div className="description">
-          <strong>Description:</strong> {provider.description}
-        </div>
-        <div className="availability">
-          <strong>Availability:</strong>
-          {provider.availability?.from ? provider.availability.from : ''}
-          {provider.availability?.to ? ` to ${provider.availability.to}` : ''}
-        </div>
-        <div className="contact-info">
-          <p><FaPhone /> {provider.phone}</p>
-          <p><FaEnvelope /> {provider.email}</p>
-        </div>
+        <p className="category-info"><FaToolbox /> <b>{provider.category}</b></p>
+        <p className="distance">
+          <FaMapMarkerAlt color="#cf1616ff" className="map-icon" /> {
+            (() => {
+              const maxWords = 5;
+              const words = (provider.location || "").split(" ");
+              const truncated = words.slice(0, maxWords).join(" ");
+              return words.length > maxWords ? truncated + "..." : truncated;
+            })()
+          }
+        </p>
+        
+        <p className="contact-info"><FaPhone /> {provider.phone}</p>
+        <p className="contact-info"><FaEnvelope /> {provider.email}</p>
         {showBookingDate && (
           <div className="booking-date">
-            <FaCalendarAlt /> {provider.bookingDate || "2025-10-13"}
+            <FaCalendarAlt /> {provider.bookingDate}
           </div>
         )}
       </div>
+      <button
+        className="connect-button"
+        onClick={() => handleSeeDetails(provider)}
+        disabled={provider.available === false}
+      >
+        {provider.available === false ? 'Currently Unavailable' : 'See Details'}
+      </button>
     </div>
   );
 
-  const ProviderModal = ({ provider, onClose, selectedServices, setSelectedServices, modalScrollTop, setModalScrollTop }) => {
-    const scrollRef = useRef();
-    useEffect(() => {
-      if (scrollRef.current) {
-        // Give the browser a moment to render before restoring scroll
-        setTimeout(() => {
-          scrollRef.current.scrollTop = modalScrollTop;
-        }, 0);
-      }
-    }, [selectedServices, modalScrollTop, provider]);
-    const handleCheckboxChange = (name, checked) => {
-      if (scrollRef.current) {
-        setModalScrollTop(scrollRef.current.scrollTop);
-      }
-      setSelectedServices(prev => ({ ...prev, [name]: checked }));
-    };
-    if (!provider) return null;
-    return (
-      <div className="modal-overlay" onClick={onClose}>
-        <div className="modal-content" onClick={e => e.stopPropagation()}>
-          <button className="modal-close-btn" onClick={onClose}>×</button>
-          
-            <h2 className="modal-provider-name">{provider.name}</h2>
-            
-            <div className="modal-provider-details">
-              <div className="modal-detail-row rating-row">
-                <FaStar className="star-icon" />
-                <span className="modal-detail-value">
-                {provider.rating ? provider.rating : "4.5"} ({provider.reviews ? provider.reviews : "120"} reviews)
-                </span>
-              </div> 
-            </div>
-            <div className="modal-contact-row">
-              <p>
-                Contact: 
-                <span className="modal-detail-value">{provider.phone}</span>
-              </p>
-              <p>
-                <FaEnvelope />
-                <span className="modal-detail-value">{provider.email}</span>
-              </p>
-          </div>
-          <div className="modal-content-scroll" ref={scrollRef}>
-            <div className="modal-provider-details">
-              <div className="modal-location-row">
-                <FaMapMarkerAlt color="#cf1616ff" className="modal-map-icon" />
-                <span className="modal-detail-value">{provider.location}</span>
-              </div>
-              <div className="modal-detail-row">
-                
-                <span className="modal-detail-value"><strong>Description:</strong> {provider.description}</span>
-              </div>
-              <div className="modal-detail-row">
-                <strong>Availability:</strong>
-                <span className="modal-detail-value">
-                {provider.availability?.from} to {provider.availability?.to}
-                </span>
-              </div>
-              {provider.subcategory && (
-              <div className="modal-subcategories">
-                <strong>Services:</strong>
-                <div className="modal-subcategory-list">
-                  {Object.entries(provider.subcategory).map(([name, price]) => (
-                  <label key={name} className="modal-subcategory-row">
-                    <input
-                      type="checkbox"
-                      checked={!!selectedServices[name]}
-                      onChange={e =>
-                        handleCheckboxChange(name, e.target.checked)
-                      }
-                    />
-                    <span className="modal-subcategory-name">{name}</span>
-                    <span className="modal-subcategory-price">₹ {price}</span>
-                  </label>
-                  ))}
-                </div>
-              </div>
-              )}
-              <hr className="modal-services-divider" />
-              <div className="modal-services-total-row">
-                <span className="modal-services-total-label"><strong>Total Price :</strong></span>
-                <span className="modal-services-total-value">
-                ₹{Object.entries(selectedServices)
-                  .filter(([name, checked]) => checked)
-                  .reduce((sum, [name]) => sum + (provider.subcategory[name] || 0), 0)}
-                </span>
-              </div>
-            </div>
-          </div>
-              <button
-                className="connect-button"
-                onClick={() => {
-                  handleConnect(provider)
-                  onClose();
-                }}
-                disabled={provider.available === false}
-              >
-                {provider.available === false ? 'Currently Unavailable' : 'Connect Now'}
-              </button>
-            
-        </div>
-      </div>
-    );
-  };
+
 
   const ProviderCard = ({ provider, showBookingDate }) => (
     <div className="provider-card">
@@ -336,7 +275,7 @@ const CustomerDashboard = () => {
         <p className="distance">
           <FaMapMarkerAlt color="#cf1616ff" className="map-icon" /> {
             (() => {
-              const maxWords = 6;
+              const maxWords = 5;
               const words = (provider.location || "").split(" ");
               const truncated = words.slice(0, maxWords).join(" ");
               return words.length > maxWords ? truncated + "..." : truncated;
@@ -491,9 +430,7 @@ const CustomerDashboard = () => {
                 ))}
               </div>
             </div>
-            {/*{connectedProvider && (*/}
-              {/*<WideProviderCard provider={connectedProvider} />*/}
-            {/*)*/}
+            
             <div>
               {connectedProvider && otherProviders.length > 0 && (
                 <h2 className="dashboard-header-bold-white" style={{ fontSize: '1.25rem', marginBottom: '1rem' }}>Other Services</h2>
@@ -536,8 +473,10 @@ const CustomerDashboard = () => {
             setSelectedServices={setSelectedServices}
             modalScrollTop={modalScrollTop}
             setModalScrollTop={setModalScrollTop}
+            handleConnect={handleConnect}
           />
         )}
+
         {activePage === 'profile' && (
           <div className="profile-page">
             <div className="profile-info-box">

@@ -83,7 +83,7 @@ public class UsersManager {
 	        if (email.compareTo("401") == 0) {
 	            return "401::Token Expired";
 	        } else {
-	            Users U = ur.findByEmail(email); // <-- corrected: get Users object by email
+	            Users U = ur.findByEmail(email); // <-- get Users object by email
 	            return U.getName();
 	        }
 	}

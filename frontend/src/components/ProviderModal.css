@@ -1,0 +1,236 @@
+/* Overlay and modal container*/
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Modal content */
+.modal-content {
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    padding: 2rem 2.5rem;
+    border-radius: 1rem;
+    width: 800px;
+    min-height: 300px;
+    max-height: 95vh;
+    position: relative;
+    box-shadow: 0 4px 24px rgba(80, 36, 143, 0.18);
+    z-index: 100000;
+}
+
+/* Scrollable inner area */
+.modal-content-scroll {
+    max-height: 55vh;
+    overflow-y: auto;
+    padding-bottom: 2em;
+    flex: 1 1 auto;
+}
+
+/* Close button */
+.modal-close-btn {
+    background: none;
+    border: none;
+    font-size: 2rem;
+    color: #6b46c1;
+    cursor: pointer;
+    position: absolute;
+    right: 1.2rem;
+    top: 1.2rem;
+}
+
+/* Provider name */
+.modal-provider-name {
+    text-align: left;
+    font-size: 2rem;
+    font-weight: bold;
+    margin-bottom: 1rem;
+}
+
+/* Provider details container */
+.modal-provider-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+}
+
+/* Location row */
+.modal-location-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5em;
+    font-size: 0.95rem;
+    margin-top: 0.5rem;
+    margin-bottom: 1.2rem;
+    color: #1b1919;
+}
+
+/* Map icon */
+.modal-map-icon {
+    flex-shrink: 0;
+    margin-right: 0.3em;
+    margin-top: 0.2em;
+    font-size: 1.15em;
+    color: #e53e3e;
+}
+
+/* Contact rows */
+.modal-contact-row {
+    display: flex;
+    flex-direction: column;
+    font-size: 0.95rem;
+    color: #7c7b7b;
+    margin-top: 1rem;
+    margin-bottom: 1.2rem;
+}
+
+.modal-contact-row p {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    margin: 0;
+}
+
+/* Generic detail row */
+.modal-detail-row {
+    display: flex;
+    align-items: center;
+    gap: 0.7em;
+    font-size: 1.07rem;
+    color: #1b1919;
+}
+
+/* Rating row */
+.rating-row {
+    color: #fbbf24;
+    font-weight: 600;
+}
+
+/* Booking rows spacing */
+.booking-row {
+    margin-top: 12px;
+}
+
+.slot-row {
+    margin-top: 12px;
+}
+
+/* Row label */
+.modal-row-label {
+    display: block;
+    margin-bottom: 6px;
+}
+
+/* Date input style */
+.date-input {
+    padding: 6px 8px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    font: inherit;
+}
+
+/* Slot select */
+.slot-select {
+    padding: 6px 8px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    font: inherit;
+}
+
+/* No slots message */
+.no-slots {
+    color: #666;
+    margin-bottom: 6px;
+    font-size: 14px;
+}
+
+/* Errors */
+.date-error,
+.slot-error {
+    margin-top: 6px;
+    color: #b00020;
+    font-size: 13px;
+}
+
+/* Subcategories */
+.modal-subcategories {
+    margin: 1em 0;
+    font-size: 1.07rem;
+}
+
+.modal-subcategory-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.7em;
+    margin-top: 0.5em;
+}
+
+.modal-subcategory-row {
+    display: flex;
+    align-items: center;
+    gap: 1em;
+    font-size: 1.04em;
+}
+
+.modal-subcategory-name {
+    flex: 1;
+    margin-left: 0.6em;
+    font-size: 1rem;
+}
+
+.modal-subcategory-price {
+    color: #2d3748;
+    font-weight: 500;
+    margin-left: 1em;
+    font-size: 1rem;
+}
+
+/* Divider and totals */
+.modal-services-divider {
+    border: none;
+    border-top: 1px solid #d4d4d4;
+    margin: 0.3em 0 0.3em 0;
+}
+
+.modal-services-total-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 600;
+    color: #2d3748;
+    font-size: 1.05em;
+    margin-top: 0em;
+    margin-bottom: 2em;
+    padding-right: 2px;
+}
+
+/* Connect button */
+.connect-button {
+    margin-top: 12px;
+    background: linear-gradient(135deg, #6b46c1, #2b6cb0);
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    align-self: flex-start;
+    font-weight: 600;
+}
+
+.connect-button:disabled {
+    background: #cbd5e0;
+    cursor: not-allowed;
+}
+
+.modal-detail-value {
+    word-break: break-word;
+}
+

@@ -103,7 +103,6 @@ public class ServicesManager {
             category = data.get("category").toString();
         }
 
-        // Subcategory: accept "subcategory" or "Subcategories" from frontend; could be JSON (Map) or String.
         Object subObj = null;
         if (data.containsKey("subcategory")) {
             subObj = data.get("subcategory");

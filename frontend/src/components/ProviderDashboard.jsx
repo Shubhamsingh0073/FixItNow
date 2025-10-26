@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FaMapMarkerAlt, FaUserCircle, FaPhone, FaEnvelope, FaHome, FaCalendarAlt, FaSignOutAlt, FaQuestionCircle, FaRegComments, FaEdit, FaTrash, FaPlus } from 'react-icons/fa';
+import { FaMapMarkerAlt, FaUserCircle, FaPhone, FaEnvelope, FaHome, FaCalendarAlt, FaSignOutAlt, FaQuestionCircle, FaRegComments, FaEdit, FaTrash, FaPlus, FaCheck, FaTimes } from 'react-icons/fa';
 import './ProviderDashboard.css';
 
 // Mock data for customers
@@ -11,11 +11,8 @@ const mockCustomers = [
   { id: 5, name: 'Emma Brown', phone: '+1122334455', email: 'emma@email.com', category: 'Appliance Repair' }
 ];
 
-// Mock bookings
-const mockPastBookings = [
-  { ...mockCustomers[1], status: 'Completed', bookingDate: '2025-09-25' },
-  { ...mockCustomers[2], status: 'Completed', bookingDate: '2025-09-20' },
-];
+// Mock bookings (initial past bookings)
+const mockPastBookings = [];
 
 // Mock provider profile
 const initialProvider = {
@@ -59,6 +56,7 @@ const ProviderDashboard = () => {
   // Sidebar navigation
   const [activePage, setActivePage] = useState('home');
   const [requests, setRequests] = useState(mockCustomers);
+  const [pastBookings, setPastBookings] = useState(mockPastBookings); // <-- new state
   const [acceptedRequest, setAcceptedRequest] = useState(null);
   const [currentBookingStatus, setCurrentBookingStatus] = useState('Pending');
   const [provider, setProvider] = useState(initialProvider);
@@ -126,7 +124,7 @@ const ProviderDashboard = () => {
       alert('Availability/description update failed: ' + error.message);
     }
   };
-  
+
 
   //save service details to backend 
   const saveServiceDetailsToBackend = async () => {
@@ -192,76 +190,72 @@ const ProviderDashboard = () => {
   // Get user data from localStorage
   useEffect(() => {
     const token = localStorage.getItem('token');
-    if (!token) {
-      console.error("No JWT found in localStorage. Please login.");
-      return;
-    }
+    if (token) {
+      fetch('http://localhost:8087/users/me', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      })
+        .then(res => {
+          if (!res.ok) throw new Error("Network response was not ok");
+          return res.json();
+        })
+        .then(data => {
+          // Backend should return { name, email, phone }
+          setUserData({ name: data.name, email: data.email, phone: data.phone });
+          setPhoneInput(data.phone || ''); // If you use a separate state for phone input
+        })
+        .catch(err => {
+          console.error('Error fetching user:', err);
+        });
 
-    fetch('http://localhost:8087/users/me', {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    })
-      .then(res => {
-        if (!res.ok) throw new Error("Network response was not ok");
-        return res.json();
-      })
-      .then(data => {
-        // Backend should return { name, email, phone }
-        setUserData({ name: data.name, email: data.email, phone: data.phone });
-        setPhoneInput(data.phone || ''); // If you use a separate state for phone input
-      })
-      .catch(err => {
-        console.error('Error fetching user:', err);
-      });
-    
-    // Fetch availability and description
-    fetch('http://localhost:8087/service/me', {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      }
-    })
-      .then(res => res.ok ? res.json() : Promise.reject('Failed to fetch service'))
-      .then(data => {
-        if (data.availability) {
-          setAvailabilityFrom(data.availability.from);
-          setAvailabilityTo(data.availability.to);
-        }
-        if (data.description) setDescriptionInput(data.description);
-      })
-      .catch(err => console.error('Service fetch error:', err));
-    
-    // fetch category and subcategories
-    fetch('http://localhost:8087/service/me', {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    })
-      .then(res => res.ok ? res.json() : Promise.reject('Failed to fetch category data'))
-      .then(data => {
-        // data should be { category: "Electrical", subcategories: { wiring: 300, repair: 500, ... } }
-        if (data.category) setSelectedCategory(data.category);
-        if (data.subcategories) {
-          // Convert to services array: [{ name: "wiring", price: 300 }, ...]
-          const savedServices = Object.entries(data.subcategories).map(([name, price]) => ({
-            name,
-            price
-          }));
-          setServices(savedServices);
+      // Fetch availability and description
+      fetch('http://localhost:8087/service/me', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
         }
       })
-      .catch(err => {
-        console.error('Category fetch error:', err);
-      });    
-    
+        .then(res => res.ok ? res.json() : Promise.reject('Failed to fetch service'))
+        .then(data => {
+          if (data.availability) {
+            setAvailabilityFrom(data.availability.from);
+            setAvailabilityTo(data.availability.to);
+          }
+          if (data.description) setDescriptionInput(data.description);
+        })
+        .catch(err => console.error('Service fetch error:', err));
+
+      // fetch category and subcategories
+      fetch('http://localhost:8087/service/me', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      })
+        .then(res => res.ok ? res.json() : Promise.reject('Failed to fetch category data'))
+        .then(data => {
+          if (data.category) setSelectedCategory(data.category);
+          if (data.subcategories) {
+            const savedServices = Object.entries(data.subcategories).map(([name, price]) => ({
+              name,
+              price
+            }));
+            setServices(savedServices);
+          }
+        })
+        .catch(err => {
+          console.error('Category fetch error:', err);
+        });
+    } else {
+      console.error("No JWT found in localStorage. Please login.");
+    }
   }, []);
-  
+
 
   // Get geolocation and address using OpenStreetMap Nominatim
   useEffect(() => {
@@ -304,8 +298,7 @@ const ProviderDashboard = () => {
       setLocation('Geolocation not supported.');
       setIsLoadingLocation(false);
     }
-    // Only run once on mount
-    // eslint-disable-next-line
+
   }, []);
 
   // Accept request
@@ -313,10 +306,31 @@ const ProviderDashboard = () => {
     setAcceptedRequest({
       ...customer,
       status: currentBookingStatus,
-      bookingDate: '2025-10-06'
+      bookingDate: new Date().toISOString().slice(0, 10)
     });
-    setRequests(requests.filter(req => req.id !== customer.id));
+    setRequests(prev => prev.filter(req => req.id !== customer.id));
     setActivePage('home');
+  };
+
+  // Cancel request -> move to past bookings with status 'Cancelled'
+  const handleCancelRequest = (customer) => {
+    const cancelledCard = {
+      ...customer,
+      status: 'Cancelled',
+      bookingDate: customer.bookingDate || new Date().toISOString().slice(0, 10)
+    };
+
+    // Remove from requests
+    setRequests(prev => prev.filter(req => req.id !== customer.id));
+
+    // If it was the acceptedRequest, clear it
+    setAcceptedRequest(prev => (prev && prev.id === customer.id ? null : prev));
+
+    // Add to past bookings
+    setPastBookings(prev => [cancelledCard, ...prev]);
+
+    // Optionally navigate to bookings tab
+    // setActivePage('bookings');
   };
 
   // Change status in bookings
@@ -395,9 +409,21 @@ const ProviderDashboard = () => {
 
   // Save Location Button
   const handleSaveLocation = () => {
-    setLocation(locationInput);
+    const trimmed = locationInput.trim();
+    if (trimmed === '') {
+      setIsEditingLocation(false);
+      return;
+    }
+
+    // update UI immediately
+    setLocation(trimmed);
     setIsEditingLocation(false);
-    saveLocationToBackend(locationInput);
+
+    // save to backend like your old code (no optimistic-revert logic)
+    saveLocationToBackend(trimmed).catch(err => {
+      console.error('Failed to save location', err);
+      alert('Failed to save location. Please try again.');
+    });
   };
 
   // Logout
@@ -419,16 +445,27 @@ const ProviderDashboard = () => {
         {customer.bookingDate && (
           <div className="card-info-item"><FaCalendarAlt /> {customer.bookingDate}</div>
         )}
-        {acceptedStatus && (
+        {acceptedStatus && customer.status && (
           <div className="card-info-item accepted-status">
             Status:
             <span className={`accepted-status-label status-${customer.status.toLowerCase().replace(/ /g, '-')}`}>{customer.status}</span>
           </div>
         )}
-        {showAccept && (
-          <div className="accept-btn-row">
-            <button className="accept-request-btn" onClick={() => handleAcceptRequest(customer)}>Accept Request</button>
+
+        {/* Buttons or status badge */}
+        {showAccept ? (
+          <div className="accept-btn-row" style={{ marginTop: '0.75rem' }}>
+            <button className="accept-request-btn" onClick={() => handleAcceptRequest(customer)} style={{ marginRight: '0.6rem' }}>Accept</button>
+            <button className="accept-request-btn" onClick={() => handleCancelRequest(customer)} style={{ background: '#e53e3e' }}>Cancel</button>
           </div>
+        ) : (
+          customer.status ? (
+            <div style={{ marginTop: '0.75rem', textAlign: 'right' }}>
+              <span style={{ fontWeight: 700, color: customer.status === 'Cancelled' ? 'red' : '#2d3748' }}>
+                {customer.status}
+              </span>
+            </div>
+          ) : null
         )}
       </div>
     </div>
@@ -448,7 +485,7 @@ const ProviderDashboard = () => {
         {customer.bookingDate && (
           <div className="card-info-item"><FaCalendarAlt /> {customer.bookingDate}</div>
         )}
-        {acceptedStatus && (
+        {acceptedStatus && customer.status && (
           <div className="card-info-item accepted-status">
             Status:
             <span className={`accepted-status-label status-${customer.status.toLowerCase().replace(/ /g, '-')}`}>{customer.status}</span>
@@ -489,29 +526,43 @@ const ProviderDashboard = () => {
           <div>
             <div className="dashboard-header">
               <h1 className="dashboard-header-bold-white">Customers Near You</h1>
-              <div style={{marginTop: '0.6rem', marginBottom: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.8rem'}}>
-                <FaMapMarkerAlt style={{fontSize: '1.2em'}} />
-                {isLoadingLocation ? (
-                  <span style={{ color: "#f0f0f0ea" }}>Fetching location...</span>
-                ) : isEditingLocation ? (
+              <div className="location-row">
+                <FaMapMarkerAlt className="map-icon location-icon" />
+                {!isEditingLocation ? (
+                  <>
+                    <div className="location-text">
+                      {isLoadingLocation ? "Fetching location..." : location}
+                    </div>
+                    <button
+                      className="edit-location-btn"
+                      onClick={handleEditLocation}
+                      title="Edit address"
+                    >
+                      <FaEdit />
+                    </button>
+                  </>
+                ) : (
                   <>
                     <input
                       type="text"
                       value={locationInput}
                       onChange={e => setLocationInput(e.target.value)}
                       placeholder="Enter your address"
-                      style={{ padding: "0.5em", borderRadius: "0.5em", fontSize: "1em", width: "18em" }}
+                      className="location-input"
                     />
-                    <button className="accept-request-btn" style={{marginLeft: "0.6em"}} onClick={handleSaveLocation}>Save</button>
-                    <button className="accept-request-btn" style={{marginLeft: "0.6em", background: "#e53e3e"}} onClick={() => setIsEditingLocation(false)}>Cancel</button>
-                  </>
-                ) : (
-                  <>
-                    <span style={{fontSize:"1em", color: "#f0f0f0ea", fontWeight: "500"}}>
-                      {location}
-                    </span>
-                    <button className="accept-request-btn" style={{marginLeft: "0.6em"}} onClick={handleEditLocation}>
-                      <FaEdit style={{marginRight: "0.4em"}} />
+                    <button
+                      className="edit-location-btn save-btn"
+                      onClick={handleSaveLocation}
+                      title="Save address"
+                    >
+                      <FaCheck />
+                    </button>
+                    <button
+                      className="edit-location-btn cancel-btn"
+                      onClick={() => setIsEditingLocation(false)}
+                      title="Cancel"
+                    >
+                      <FaTimes />
                     </button>
                   </>
                 )}
@@ -567,7 +618,7 @@ const ProviderDashboard = () => {
             </div>
             <h2 className="dashboard-header-bold-white">Past Bookings</h2>
             <div className="providers-grid">
-              {mockPastBookings.map(customer => (
+              {pastBookings.map(customer => (
                 <CustomerSmallCard key={customer.id} customer={customer} />
               ))}
             </div>
@@ -652,8 +703,6 @@ const ProviderDashboard = () => {
             <div className="profile-info-box wide-profile-box" style={{marginBottom: '0.5rem', position: 'relative', minHeight: '180px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start'}}>
               <h2 className="profile-reviews-heading" style={{fontSize: '1.33rem', marginBottom: '0.7rem'}}>Service Details</h2>
               <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: '1.2rem'}}>
-                
-
                 {/* Edit Services Button */}
                 <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: '1.2rem'}}>
                   <div style={{display: 'flex', alignItems: 'center', gap: '0.7rem'}}>
@@ -688,7 +737,7 @@ const ProviderDashboard = () => {
                         disabled={!isEditingServices}
                       >
                         <FaPlus /> Add services
-                      </button>            
+                      </button>
                     </>
                   ) : (
                     <button
@@ -743,7 +792,7 @@ const ProviderDashboard = () => {
                 )}
               </div>
 
-              
+
               {/* Save button at bottom right */}
               {isEditingServices && (
                 <div style={{
