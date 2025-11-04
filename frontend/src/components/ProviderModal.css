@@ -17,22 +17,153 @@
     display: flex;
     flex-direction: column;
     background: #fff;
-    padding: 2rem 2.5rem;
+    padding: 1.75rem 1.75rem 1.75rem 1.75rem;
     border-radius: 1rem;
-    width: 800px;
-    min-height: 300px;
-    max-height: 95vh;
+    width: 97%;
+    height: 97%;
     position: relative;
     box-shadow: 0 4px 24px rgba(80, 36, 143, 0.18);
     z-index: 100000;
 }
 
+.modal-inner {
+    display: flex;
+    gap: 1.3rem;
+    height: 100%;
+    align-items: stretch;
+    margin-bottom: 1rem;
+}
+
+.modal-left {
+    width: 34%;
+    min-width: 220px;
+    height: 100%;
+    padding: 2rem 1.5rem;
+    border-radius: 0.75rem;
+    color: #fff;
+    background: linear-gradient(135deg, #6b46c1, #2b6cb0);
+    /* matches your dashboard */
+    box-shadow: 0 6px 18px rgba(80, 36, 143, 0.09);
+    display: flex;
+    flex-direction: column;
+    gap: 0rem;
+}
+
+.modal-provider-name-left {
+    margin: 0.7em 0 0.7em 0;
+    font-size: 2rem;
+    font-weight: 700;
+    color: #fff;
+    text-align: center;
+    letter-spacing: 0.5px;
+
+}
+
+.modal-left-inner {
+    display: flex;
+    gap: 0.5rem;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1rem;
+}
+
+.modal-left-rating {
+    width: 100%;
+    height: 70px;
+    padding: 0.5rem 1rem 0.5rem 1rem;
+    border-radius: 0.5rem;
+    border: 1px solid #faf3f3fa;
+    background: #fdfdfd;
+    align-items: center;
+    /* horizontal center */
+    justify-content: center;
+    /* vertical center */
+    text-align: center;
+    box-shadow: 0 6px 18px rgba(80, 36, 143, 0.09);
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.modal-left-rating .modal-rating-value {
+    color: #fbbf24;
+    font-weight: 700;
+    font-size: 2em;
+    margin: 0;
+    line-height: 1.1;
+}
+
+.modal-left-rating .modal-rating-label {
+    color: #2521eb;
+    font-size: 1em;
+    font-weight: 500;
+    margin: 0;
+    line-height: 1.1;
+}
+
+/* Remove unnecessary margin from svg/icon if present */
+.modal-left-rating svg {
+    margin: 0;
+    margin-bottom: 0.05em;
+}
+
+
+.modal-detail-value-rating {
+    word-break: break-word;
+    color: #2521eb;
+    font-size: 1.1em;
+    align-items: center;
+}
+
+.modal-detail-value-left {
+    word-break: break-word;
+    color: #faf3f3fa;
+    font-size: 0.85em;
+    font-weight: 450;
+    margin-top: 0em;
+    align-items: center;
+}
+
+.modal-right {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+    height: 100%;
+    background: #fff;
+    border-radius: 0.75rem;
+    padding: 0.75rem 1rem 0.75rem 1rem;
+    box-shadow: 0 6px 18px rgba(80, 36, 143, 0.06);
+    flex-direction: column;
+    justify-content: flex-start; /* all children stack vertically from top */
+    align-items: stretch;
+}
+
+
+@media (max-width: 820px) {
+  .modal-content {
+    width: 95vw;
+    padding: 1rem;
+  }
+  .modal-inner {
+    flex-direction: column;
+  }
+  .modal-left {
+    width: 100%;
+    min-width: unset;
+  }
+  .modal-right {
+    width: 100%;
+  }
+}
+
 /* Scrollable inner area */
 .modal-content-scroll {
-    max-height: 55vh;
+    max-height: 41vh;
     overflow-y: auto;
     padding-bottom: 2em;
     flex: 1 1 auto;
+    min-height: 0;
 }
 
 /* Close button */
@@ -50,7 +181,7 @@
 /* Provider name */
 .modal-provider-name {
     text-align: left;
-    font-size: 2rem;
+    font-size: 1.5rem;
     font-weight: bold;
     margin-bottom: 1rem;
 }
@@ -69,15 +200,15 @@
     gap: 0.5em;
     font-size: 0.95rem;
     margin-top: 0.5rem;
-    margin-bottom: 1.2rem;
-    color: #1b1919;
+    margin-bottom: 0.3rem;
+    color: #fffaf5;
 }
 
 /* Map icon */
 .modal-map-icon {
     flex-shrink: 0;
     margin-right: 0.3em;
-    margin-top: 0.2em;
+    margin-top: 0.05em;
     font-size: 1.15em;
     color: #e53e3e;
 }
@@ -87,8 +218,8 @@
     display: flex;
     flex-direction: column;
     font-size: 0.95rem;
-    color: #7c7b7b;
-    margin-top: 1rem;
+    color: #fffaf5;
+    margin-top: 0.5rem;
     margin-bottom: 1.2rem;
 }
 
@@ -215,6 +346,9 @@
 /* Connect button */
 .connect-button {
     margin-top: 12px;
+    margin-bottom: 0;
+    padding-bottom: 0;
+    min-height: 0;
     background: linear-gradient(135deg, #6b46c1, #2b6cb0);
     color: white;
     border: none;
@@ -230,7 +364,9 @@
     cursor: not-allowed;
 }
 
-.modal-detail-value {
-    word-break: break-word;
+.reviews-right {
+    /* already set inline, but you can add here for consistency */
+    z-index: 1111;
 }
+
 

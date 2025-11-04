@@ -47,20 +47,7 @@ public class ServicesManager {
         return sr.save(service);
     }
 
-    /**
-     * Update service details for the provider.
-     *
-     * Supported incoming keys in the data map:
-     * - "availability" : any object (will be serialized to JSON string)
-     * - "description"  : String
-     * - "category"     : String
-     * - "subcategory"  : either a structured object (Map) or a String.
-     *                   If structured, it will be serialized to a JSON string and stored in the TEXT column.
-     *                   Also accepts "Subcategories" (capitalized) if frontend sends that.
-     *
-     * This method updates all Services rows returned by findByProvider(provider).
-     * If no service exists, a default service is created and then updated.
-     */
+    /*Update service details for the provider. */
     public void updateServiceDetails(Users provider, Map<String, Object> data) {
         if (provider == null) {
             throw new IllegalArgumentException("provider must not be null");
@@ -113,8 +100,6 @@ public class ServicesManager {
         String subcategoryJson = null;
         if (subObj != null) {
             if (subObj instanceof String) {
-                // If frontend sent a JSON string (like "{"a":100}") or a plain string,
-                // store it as-is.
                 subcategoryJson = ((String) subObj).trim();
             } else {
                 // Structured object/array -> serialize to JSON string

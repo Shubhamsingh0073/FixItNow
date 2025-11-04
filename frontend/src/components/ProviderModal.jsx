@@ -1,13 +1,94 @@
 import React, { useRef, useEffect, useState } from "react";
-import { FaStar, FaEnvelope, FaMapMarkerAlt } from "react-icons/fa";
+import { FaStar, FaEnvelope, FaMapMarkerAlt, FaPhone, FaUserCircle, FaCommentDots } from "react-icons/fa";
 import "./ProviderModal.css";
+import Reviews from "./Reviews";
+
+// ChatPanel component
+const WS_BASE_URL = "ws://localhost:8087/ws";
+
+const ChatPanel = ({ providerId, customerId, onBack }) => {
+  const [messages, setMessages] = useState([]);
+  const [inputMsg, setInputMsg] = useState("");
+  const socketRef = useRef();
+
+  useEffect(() => {
+    // For provider chat: ws://.../ws/chat?customerId=...&providerId=...
+    const url = `${WS_BASE_URL}/chat?customerId=${customerId}&providerId=${providerId}`;
+    socketRef.current = new window.WebSocket(url);
+
+    socketRef.current.onopen = () => {
+      // You may send a join event/message here if your backend expects it
+    };
+    socketRef.current.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      setMessages((prev) => [...prev, data]);
+    };
+    socketRef.current.onerror = (e) => console.error("WebSocket error", e);
+    socketRef.current.onclose = () => {
+      // Optionally handle disconnect
+    };
+    return () => {
+      socketRef.current.close();
+    };
+  }, [providerId, customerId]);
+
+  const sendMessage = () => {
+    if (!inputMsg.trim()) return;
+    const msgData = {
+      sender: "customer",
+      message: inputMsg,
+      to: providerId
+    };
+    try {
+      socketRef.current.send(JSON.stringify(msgData));
+      setMessages((prev) => [...prev, { sender: "me", message: inputMsg }]);
+      setInputMsg("");
+    } catch (err) {
+      alert("Failed to send message");
+    }
+  };
+
+  return (
+    <div className="chat-panel">
+      <button className="back-to-booking-btn" onClick={onBack}>⬅ Back</button>
+      <h2 className="chat-title">Chat</h2>
+      <div className="chat-messages">
+        {messages.map((msg, idx) => (
+          <div key={idx} className={`chat-msg ${msg.sender}`}>
+            <b>
+              {msg.sender === "admin"
+                ? "Admin"
+                : msg.sender === "provider"
+                ? "Provider"
+                : msg.sender === "customer"
+                ? "You"
+                : msg.sender === "me"
+                ? "You"
+                : msg.sender}
+            </b>: {msg.message}
+          </div>
+        ))}
+      </div>
+      <div className="chat-input-row">
+        <input
+          type="text"
+          value={inputMsg}
+          placeholder="Type a message..."
+          onChange={e => setInputMsg(e.target.value)}
+          className="chat-input"
+        />
+        <button className="chat-send-btn" onClick={sendMessage}>Send</button>
+      </div>
+    </div>
+  );
+};
+
 
 function formatForInput(date) {
   const pad = (n) => String(n).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
-/** parse 'YYYY-MM-DD' into a local Date at midnight */
 function parseDateInput(value) {
   if (!value) return null;
   const [y, m, d] = value.split("-").map((s) => parseInt(s, 10));
@@ -18,7 +99,6 @@ function parseTimeStringToMinutes(timeStr) {
   if (!timeStr && timeStr !== 0) return null;
   const s = String(timeStr).trim().toLowerCase();
 
-  // am/pm formats like "7:30am" or "7:30 am" or "7 pm"
   const ampmMatch = s.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/);
   if (ampmMatch) {
     let h = parseInt(ampmMatch[1], 10);
@@ -29,7 +109,6 @@ function parseTimeStringToMinutes(timeStr) {
     return h * 60 + m;
   }
 
-  // 24h hh:mm
   const hhmm = s.match(/^(\d{1,2}):(\d{2})$/);
   if (hhmm) {
     const h = parseInt(hhmm[1], 10);
@@ -37,7 +116,6 @@ function parseTimeStringToMinutes(timeStr) {
     return h * 60 + m;
   }
 
-  // single number "7" or "07" -> 7:00
   const num = s.match(/^(\d{1,2})$/);
   if (num) {
     const h = parseInt(num[1], 10);
@@ -47,12 +125,11 @@ function parseTimeStringToMinutes(timeStr) {
   return null;
 }
 
-/** format minutes-since-midnight to "7:30 AM" */
 function formatMinutesToDisplay(minutes) {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
   const ampm = h >= 12 ? "PM" : "AM";
-  const hour12 = ((h + 11) % 12) + 1; // convert 0->12
+  const hour12 = ((h + 11) % 12) + 1;
   return `${hour12}:${String(m).padStart(2, "0")} ${ampm}`;
 }
 
@@ -66,26 +143,70 @@ const ProviderModal = ({
   modalScrollTop,
   setModalScrollTop,
   handleConnect,
+  booking = null,
+  viewingBooking = false,
 }) => {
   const scrollRef = useRef();
   const [selectedDate, setSelectedDate] = useState("");
   const [dateError, setDateError] = useState("");
-
-  // Define local today/min/max inside the component
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const minDate = new Date(today); // today inclusive
+  const minDate = new Date(today);
   const maxDate = new Date(today);
-  maxDate.setDate(maxDate.getDate() + 13); // today + 13 => 14-day window inclusive
+  maxDate.setDate(maxDate.getDate() + 13);
 
   const minDateStr = formatForInput(minDate);
   const maxDateStr = formatForInput(maxDate);
 
-  const [timeSlots, setTimeSlots] = useState([]); // array of { value: "HH:MM", label: "7:30 AM" }
+  const [timeSlots, setTimeSlots] = useState([]);
   const [selectedSlot, setSelectedSlot] = useState("");
   const [slotError, setSlotError] = useState("");
 
-  // compute time slots based on provider.availability.from/to
+  // rightPanel: booking, reviews, chat
+  const [rightPanel, setRightPanel] = useState('booking'); 
+  const customerId =
+    JSON.parse(localStorage.getItem("currentUser"))?.id || localStorage.getItem("customerId");
+
+  const submitBooking = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      alert("You must be logged in to book. Please login.");
+      return;
+    }
+    const bookedServices = {};
+    Object.entries(selectedServices)
+      .filter(([name, checked]) => checked)
+      .forEach(([name]) => {
+        bookedServices[name] = provider.subcategory[name];
+      });
+
+    const payload = {
+      providerId: provider.id,
+      bookingDate: selectedDate,
+      timeSlot: selectedSlot,
+      bookedServices: bookedServices,
+      status: "PENDING",
+    };
+
+    try {
+      const response = await fetch("http://localhost:8087/bookings/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to submit booking");
+      }
+      alert("Booked successfully!");
+    } catch (error) {
+      alert("Booking failed: " + error.message);
+    }
+  };
+
   useEffect(() => {
     const fromStr = provider?.availability?.from;
     const toStr = provider?.availability?.to;
@@ -94,17 +215,14 @@ const ProviderModal = ({
     const endMin = parseTimeStringToMinutes(toStr);
 
     if (startMin == null || endMin == null) {
-      // no valid availability times -> empty slots
       setTimeSlots([]);
       setSelectedSlot("");
       return;
     }
 
-    // end of allowed start times is 2 hours before the 'to' time
-    const latestStart = endMin - 120; // minutes
+    const latestStart = endMin - 120;
 
     if (latestStart < startMin) {
-      // no available slots (availability window shorter than 2 hours)
       setTimeSlots([]);
       setSelectedSlot("");
       return;
@@ -114,17 +232,45 @@ const ProviderModal = ({
     for (let t = startMin; t <= latestStart; t += SLOT_MINUTES) {
       const hours = Math.floor(t / 60);
       const mins = t % 60;
-      const value = `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`; // "07:30" 24h
+      const value = `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
       slots.push({ value, label: formatMinutesToDisplay(t) });
     }
 
     setTimeSlots(slots);
-    // default to first slot if available
     setSelectedSlot(slots.length > 0 ? slots[0].value : "");
     setSlotError("");
   }, [provider]);
 
-  // Restore modal scroll position when reopening
+  const [allReviews, setAllReviews] = useState([]);
+  const [loadingReviews, setLoadingReviews] = useState(true);
+
+  // Fetch reviews when modal opens
+  useEffect(() => {
+    if (rightPanel === 'booking' || rightPanel === 'reviews') {
+      const fetchReviews = async () => {
+        try {
+          const response = await fetch("http://localhost:8087/reviews/all");
+          if (!response.ok) throw new Error("Error fetching reviews");
+          const data = await response.json();
+          setAllReviews(data);
+        } catch (err) {
+          console.error(err);
+          setAllReviews([]);
+        }
+        setLoadingReviews(false);
+      };
+      fetchReviews();
+    }
+  }, [rightPanel]);
+
+  const providerReviews = allReviews.filter(r => r.provider_id === provider.id);
+
+  const overallRating = providerReviews.length > 0
+    ? (providerReviews.reduce((sum, r) => sum + r.rating, 0) / providerReviews.length).toFixed(2)
+    : "No rating";
+
+  const totalReviews = providerReviews.length;
+
   useEffect(() => {
     if (scrollRef.current) {
       setTimeout(() => {
@@ -133,7 +279,6 @@ const ProviderModal = ({
     }
   }, [selectedServices, modalScrollTop, provider]);
 
-  // When modal opens for a provider, default date to today (optional)
   useEffect(() => {
     setDateError("");
     setSelectedDate(minDateStr);
@@ -141,11 +286,11 @@ const ProviderModal = ({
 
   const handleCheckboxChange = (name, checked) => {
     if (scrollRef.current) setModalScrollTop(scrollRef.current.scrollTop || 0);
-    setSelectedServices((prev) => ({ ...prev, [name]: checked }));
+    setSelectedServices(prev => ({ ...prev, [name]: checked }));
   };
 
   const onDateChange = (e) => {
-    const val = e.target.value; // 'YYYY-MM-DD' or ''
+    const val = e.target.value;
     setSelectedDate(val);
 
     if (!val) {
@@ -159,7 +304,6 @@ const ProviderModal = ({
       return;
     }
 
-    // normalize comparisons
     const min = parseDateInput(minDateStr);
     const max = parseDateInput(maxDateStr);
     if (chosen < min || chosen > max) {
@@ -169,7 +313,7 @@ const ProviderModal = ({
     }
   };
 
-  const onConnectClick = () => {
+  const onConnectClick = async () => {
     if (provider?.available === false) return;
 
     if (!selectedDate || dateError) {
@@ -177,7 +321,6 @@ const ProviderModal = ({
       return;
     }
 
-    // require slot if slots exist
     if (timeSlots.length > 0 && !selectedSlot) {
       setSlotError("Please select a time slot.");
       return;
@@ -185,8 +328,8 @@ const ProviderModal = ({
 
     setSlotError("");
 
-    // call parent handler with provider, selectedDate, selectedServices, selectedSlot
-    // selectedSlot is in "HH:MM" 24-hour format (e.g., "07:30")
+    await submitBooking();
+
     handleConnect(provider, selectedDate, selectedServices, selectedSlot);
 
     onClose();
@@ -197,132 +340,218 @@ const ProviderModal = ({
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <button className="modal-close-btn" onClick={onClose}>
-          ×
-        </button>
-
-        <h2 className="modal-provider-name">{provider.name}</h2>
-
-        <div className="modal-provider-details">
-          <div className="modal-detail-row rating-row">
-            <FaStar className="star-icon" />
-            <span className="modal-detail-value">
-              {provider.rating ?? "4.5"} ({provider.reviews ?? "120"} reviews)
-            </span>
-          </div>
-        </div>
-
-        <div className="modal-contact-row">
-          <p>Contact: <span className="modal-detail-value">{provider.phone}</span></p>
-          <p><FaEnvelope /><span className="modal-detail-value">{provider.email}</span></p>
-        </div>
-
-        <div className="modal-content-scroll" ref={scrollRef}>
-          <div className="modal-provider-details">
-            <div className="modal-location-row">
-              <FaMapMarkerAlt color="#cf1616ff" className="modal-map-icon" />
-              <span className="modal-detail-value">{provider.location}</span>
+        <button className="modal-close-btn" onClick={onClose}>×</button>
+        <div className="modal-inner">
+          {/* LEFT BOX: Provider Details */}
+          <div className="modal-left">
+            <div className="card-profile">
+              <FaUserCircle color="#fdfdfd" size={90} />
             </div>
-
-            <div className="modal-detail-row">
-              <span className="modal-detail-value"><strong>Description:</strong> {provider.description}</span>
-            </div>
-
-            <div className="modal-detail-row">
-              <strong>Availability:</strong>
-              <span className="modal-detail-value">
-                {provider.availability?.from ?? ""} {provider.availability?.to ? ` to ${provider.availability.to}` : ""}
-              </span>
-            </div>
-
-            {/* Booking date picker */}
-            <div className="modal-detail-row booking-row">
-              <label className="modal-row-label">
-                <strong>Choose booking date:</strong>
-              </label>
-
-              <input
-                className="date-input"
-                type="date"
-                value={selectedDate}
-                onChange={onDateChange}
-                min={minDateStr}
-                max={maxDateStr}
-                aria-label="Booking date"
-              />
-
-              {dateError && <div className="date-error">{dateError}</div>}
-            </div>
-
-            {/* New: select time slot dropdown */}
-            <div className="modal-detail-row slot-row">
-              <label className="modal-row-label">
-                <strong>Select time slot:</strong>
-              </label>
-
-              {timeSlots.length === 0 ? (
-                <div className="no-slots">
-                  No time slots available for this provider's availability.
-                </div>
-              ) : (
-                <select
-                  className="slot-select"
-                  value={selectedSlot}
-                  onChange={(e) => {
-                    setSelectedSlot(e.target.value);
-                    setSlotError("");
-                  }}
+            <h2 className="modal-provider-name-left">{provider.name}</h2>
+            <div className="modal-provider-details">
+              <div className="modal-left-inner">
+                <div className="modal-left-rating"
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => setRightPanel('reviews')}
+                  tabIndex={0}
+                  role="button"
+                  title="See reviews"
                 >
-                  {timeSlots.map((s) => (
-                    <option key={s.value} value={s.value}>
-                      {s.label}
-                    </option>
-                  ))}
-                </select>
-              )}
-
-              {slotError && <div className="slot-error">{slotError}</div>}
-            </div>
-
-            {provider.subcategory && (
-              <div className="modal-subcategories">
-                <strong>Services:</strong>
-                <div className="modal-subcategory-list">
-                  {Object.entries(provider.subcategory).map(([name, price]) => (
-                    <label key={name} className="modal-subcategory-row">
-                      <input
-                        type="checkbox"
-                        checked={!!selectedServices[name]}
-                        onChange={(e) => handleCheckboxChange(name, e.target.checked)}
-                      />
-                      <span className="modal-subcategory-name">{name}</span>
-                      <span className="modal-subcategory-price">₹ {price}</span>
-                    </label>
-                  ))}
+                  <FaStar color="#fbbf24" size={32} />
+                  <span className="modal-rating-label">
+                    {loadingReviews ? "..." : `${overallRating}/5`}
+                  </span>
+                </div>
+                <div
+                  className="modal-left-rating"
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => setRightPanel('reviews')}
+                  tabIndex={0}
+                  role="button"
+                  title="See all reviews"
+                >
+                  <span className="modal-rating-value">
+                    {loadingReviews ? "..." : totalReviews}
+                  </span>
+                  <span className="modal-rating-label">reviews</span>
+                </div>
+                <div
+                  className="modal-left-rating"
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => setRightPanel('chat')}
+                  tabIndex={0}
+                  role="button"
+                  title="Chat with Provider or Admin"
+                >
+                  <FaCommentDots color="#6156f8ff" size={32} />
+                  <span className="modal-rating-label">Chat</span>
                 </div>
               </div>
-            )}
-
-            <hr className="modal-services-divider" />
-
-            <div className="modal-services-total-row">
-              <span className="modal-services-total-label"><strong>Total Price :</strong></span>
-              <span className="modal-services-total-value">
-                ₹{Object.entries(selectedServices)
-                  .filter(([name, checked]) => checked)
-                  .reduce((sum, [name]) => sum + (provider.subcategory?.[name] || 0), 0)}
-              </span>
+            </div>
+            <div className="modal-left-info">
+              <div className="modal-contact-row">
+                <p>Contact: <span className="modal-detail-value">{provider.phone}</span></p>
+                <p><FaEnvelope /><span className="modal-detail-value">{provider.email}</span></p>
+              </div>
+              <p className="modal-location-row">
+                <FaMapMarkerAlt color="#cf1616ff" className="modal-map-icon" />
+                Location:
+              </p>
+              <p className="modal-detail-value-left">{provider.location}</p>
             </div>
           </div>
-        </div>
+          {/* RIGHT BOX: Booking/services controls */}
+          <div className="modal-right">
+            <h2 className="modal-provider-name">
+              {viewingBooking ? "Booking Details" : "Booking Form"}
+            </h2>
+            <div className="modal-provider-details">
+              <div className="modal-detail-row">
+                <span className="modal-detail-value"><strong>Description:</strong> {provider.description}</span>
+              </div>
+              <div className="modal-detail-row">
+                <strong>Availability:</strong>
+                <span className="modal-detail-value">
+                  {provider.availability?.from ?? ""} {provider.availability?.to ? ` to ${provider.availability.to}` : ""}
+                </span>
+              </div>
+              {/* BOOKING FORM: Only show if not viewingBooking */}
+              {!viewingBooking ? (
+                <>
+                  <div className="modal-detail-row booking-row">
+                    <label className="modal-row-label">
+                      <strong>Choose booking date:</strong>
+                    </label>
+                    <input
+                      className="date-input"
+                      type="date"
+                      value={selectedDate}
+                      onChange={onDateChange}
+                      min={minDateStr}
+                      max={maxDateStr}
+                      aria-label="Booking date"
+                    />
+                    {dateError && <div className="date-error">{dateError}</div>}
 
-        <button
-          className="connect-button"
-          onClick={onConnectClick}
-          disabled={provider.available === false || !!dateError || !selectedDate || (timeSlots.length > 0 && !selectedSlot)}
-        >
-          {provider.available === false ? "Currently Unavailable" : "Connect Now"}
-        </button>
+                    <label className="modal-row-label">
+                      <strong>Time slot:</strong>
+                    </label>
+                    {timeSlots.length === 0 ? (
+                      <div className="no-slots">
+                        No time slots available for this provider's availability.
+                      </div>
+                    ) : (
+                      <select
+                        className="slot-select"
+                        value={selectedSlot}
+                        onChange={(e) => {
+                          setSelectedSlot(e.target.value);
+                          setSlotError("");
+                        }}
+                      >
+                        {timeSlots.map((s) => (
+                          <option key={s.value} value={s.value}>
+                            {s.label}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    {slotError && <div className="slot-error">{slotError}</div>}
+                  </div>
+                  <div className="modal-content-scroll" ref={scrollRef}>
+                    <div className="modal-provider-details">
+                      {provider.subcategory && (
+                        <div className="modal-subcategories">
+                          <strong>Services:</strong>
+                          <div className="modal-subcategory-list">
+                            {Object.entries(provider.subcategory).map(([name, price]) => (
+                              <label key={name} className="modal-subcategory-row">
+                                <input
+                                  type="checkbox"
+                                  checked={!!selectedServices[name]}
+                                  onChange={(e) => handleCheckboxChange(name, e.target.checked)}
+                                />
+                                <span className="modal-subcategory-name">{name}</span>
+                                <span className="modal-subcategory-price">₹ {price}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      <hr className="modal-services-divider" />
+                      <div className="modal-services-total-row">
+                        <span className="modal-services-total-label"><strong>Total Price :</strong></span>
+                        <span className="modal-services-total-value">
+                          ₹{Object.entries(selectedServices)
+                            .filter(([name, checked]) => checked)
+                            .reduce((sum, [name]) => sum + (provider.subcategory?.[name] || 0), 0)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    className="connect-button"
+                    onClick={onConnectClick}
+                    disabled={
+                      provider.available === false ||
+                      !!dateError ||
+                      !selectedDate ||
+                      (timeSlots.length > 0 && !selectedSlot)
+                    }
+                  >
+                    {provider.available === false ? "Currently Unavailable" : "Connect Now"}
+                  </button>
+                </>
+              ) : (
+                /* BOOKING DETAILS: Only show if viewingBooking is true */
+                booking && (
+                  <>
+                    <div className="modal-detail-row">
+                      <strong>Booking Date:</strong> {booking.bookingDate}
+                    </div>
+                    <div className="modal-detail-row">
+                      <strong>Time Slot:</strong> {booking.timeSlot}
+                    </div>
+                    <div className="modal-subcategories">
+                      <strong>Booked Services:</strong>
+                      <div className="modal-subcategory-list">
+                        {booking.bookedServices &&
+                          Object.entries(booking.bookedServices).map(([name, price]) => (
+                            <div key={name} className="modal-subcategory-row">
+                              <span className="modal-subcategory-name">{name}</span>
+                              <span className="modal-subcategory-price">₹ {price}</span>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                    <div className="modal-services-total-row">
+                      <span className="modal-services-total-label"><strong>Total Price :</strong></span>
+                      <span className="modal-services-total-value">
+                        ₹{booking.bookedServices
+                          ? Object.values(booking.bookedServices).reduce((sum, price) => sum + price, 0)
+                          : 0}
+                      </span>
+                    </div>
+                  </>
+                )
+              )}
+            </div>
+          </div>
+          {rightPanel === "reviews" && (
+            <Reviews
+              provider={provider}
+              onBack={() => setRightPanel('booking')}
+              bookingId={booking ? booking.bookingId : null}
+            />
+          )}
+          {rightPanel === "chat" && (
+            <ChatPanel
+              providerId={provider.id}
+              customerId={customerId}
+              onBack={() => setRightPanel('booking')}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

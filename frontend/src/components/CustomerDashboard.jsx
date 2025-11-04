@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FaMapMarkerAlt, FaSearch, FaTools, FaStar, FaPhone, FaEnvelope, FaUser, FaHome, FaCalendarAlt, FaUserCircle, FaSignOutAlt, FaQuestionCircle, FaRegComments, FaRegThumbsUp, FaEdit, FaTimes, FaCheck, FaToolbox } from 'react-icons/fa';
+import { FaMapMarkerAlt, FaSearch, FaTools, FaStar, FaPhone, FaEnvelope, FaUser, FaHome, FaCalendarAlt, FaUserCircle, FaSignOutAlt, FaQuestionCircle, FaRegComments, FaRegThumbsUp, FaEdit, FaTimes, FaCheck, FaToolbox, FaClock } from 'react-icons/fa';
 import './CustomerDashboard.css';
 import ProviderModal from "./ProviderModal";
 
@@ -52,11 +52,15 @@ const CustomerDashboard = () => {
   const [phoneInput, setPhoneInput] = useState('');
   const [connectedProvider, setConnectedProvider] = useState(null);
 
+  const [isEditingPhone, setIsEditingPhone] = useState(false);
+
+  const [modalBooking, setModalBooking] = useState(null);
+
   const [modalScrollTop, setModalScrollTop] = useState(0);
   const [selectedServices, setSelectedServices] = useState({});
   const [showModal, setShowModal] = useState(false);
   const [modalProvider, setModalProvider] = useState(null);
-
+ 
   useEffect(() => {
     const fetchProviders = async () => {
       try {
@@ -86,13 +90,18 @@ const CustomerDashboard = () => {
           fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
             .then(response => response.json())
             .then(data => {
-              setLocation(data.display_name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`);
-              setLocationInput(data.display_name || '');
+              const locationText = data.display_name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+              setLocation(locationText);
+              setLocationInput(locationText);
               setIsLoadingLocation(false);
+              saveLocationToBackend(locationText);
             })
             .catch(err => {
-              setLocation(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+              const locationText = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+              setLocation(locationText);
+              setLocationInput(locationText);
               setIsLoadingLocation(false);
+              saveLocationToBackend(locationText);
             });
         },
         (error) => {
@@ -104,6 +113,62 @@ const CustomerDashboard = () => {
       setLocation('Geolocation not supported.');
       setIsLoadingLocation(false);
     }
+  }, []);
+
+
+  const [customerBookings, setCustomerBookings] = useState([]);
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    fetch('http://localhost:8087/bookings/customer/me', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    })
+      .then(res => res.ok ? res.json() : Promise.reject('Failed to fetch bookings'))
+      .then(data => {
+        setCustomerBookings(data); // Array of bookings received from backend
+      })
+      .catch(err => {
+        console.error('Error fetching customer bookings:', err);
+        setCustomerBookings([]);
+      });
+  }, []);
+
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      console.error('No token found. Please login.');
+      return;
+    }
+    fetch('http://localhost:8087/users/me', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    })
+      .then(res => {
+        if (!res.ok) throw new Error('Network response was not ok');
+        return res.json();
+      })
+      .then(data => {
+        // Backend should return { name, email, phone }
+        setCurrentUser({
+          name: data.name || '',
+          email: data.email || '',
+          phone: data.phone || ''
+        });
+        setPhoneInput(data.phone || '');
+      })
+      .catch(err => {
+        console.error('Error fetching user:', err);
+      });
   }, []);
 
 
@@ -144,16 +209,40 @@ const CustomerDashboard = () => {
     return matchesCategory && matchesSearch;
   });
 
-  const otherProviders = connectedProvider
-    ? filteredProviders.filter(p => p.id !== connectedProvider.id)
-    : filteredProviders;
+  
+  const bookedProviderIds = new Set(
+    customerBookings
+      .filter(b => b.status) // status is assigned
+      .map(b => b.providerId) // assuming booking has providerId
+  );
+  
+  const homeProviders = filteredProviders.filter(
+    p => !bookedProviderIds.has(p.id)
+  );
 
 
-const handleConnect = (provider, bookingDate, selectedServicesFromModal) => {
-  const providerWithBooking = { ...provider, bookingDate };
-  setConnectedProvider(providerWithBooking);
-  setSelectedServices(selectedServicesFromModal || {});
-  setActivePage('home');
+const handleConnect = (provider, bookingDate, selectedServicesFromModal, selectedSlot) => {
+  // Prepare the booked services object
+  const bookedServices = {};
+  Object.entries(selectedServicesFromModal || {})
+    .filter(([name, checked]) => checked)
+    .forEach(([name]) => {
+      bookedServices[name] = provider.subcategory[name];
+    });
+
+  // Create the new booking object as expected in your booking cards
+  const newBooking = {
+    bookingId: Date.now(), // Or get from backend later
+    providerId: provider.id,
+    status: "PENDING",
+    bookingDate,
+    timeSlot: selectedSlot,
+    bookedServices,
+  };
+
+  setCustomerBookings(prev => [...prev, newBooking]);
+  setActivePage('bookings');
+  setShowModal(false); // Close the modal
 };
 
   const handleLogout = () => {
@@ -161,9 +250,33 @@ const handleConnect = (provider, bookingDate, selectedServicesFromModal) => {
     window.location.href = '/login';
   };
 
-  const handlePhoneSave = () => {
+
+  const savePhoneToBackend = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      alert('No token found. Please login.');
+      return;
+    }
+    try {
+      const response = await fetch('http://localhost:8087/users/me/phone', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ phone: phoneInput }),
+      });
+      if (!response.ok) throw new Error('Failed to save phone');
+    } catch (error) {
+      alert('Phone update failed: ' + error.message);
+    }
+  };
+
+  const handlePhoneSave = async () => {
     setCurrentUser(prev => ({ ...prev, phone: phoneInput }));
     localStorage.setItem('currentUser', JSON.stringify({ ...currentUser, phone: phoneInput }));
+    setIsEditingPhone(false);
+    await savePhoneToBackend();
     alert("Phone number saved!");
   };
 
@@ -216,6 +329,13 @@ const handleConnect = (provider, bookingDate, selectedServicesFromModal) => {
   const handleSeeDetails = (provider) => {
     setModalProvider(provider);
     setShowModal(true);
+    setModalBooking(null);
+    // Reset selectedServices for all catalog services to false!
+    const initialState = {};
+    if (provider && provider.subcategory) {
+      Object.keys(provider.subcategory).forEach(svc => initialState[svc] = false);
+    }
+    setSelectedServices(initialState);
   };
 
   const handleCloseModal = () => {
@@ -223,14 +343,10 @@ const handleConnect = (provider, bookingDate, selectedServicesFromModal) => {
     setModalProvider(null);
   };
 
-  const WideProviderCard = ({ provider, showBookingDate }) => (
+  const WideProviderCard = ({ provider, booking, onSeeDetails }) => (
     <div className="provider-card">
       <div className="provider-info">
         <h3><b>{provider.name}</b></h3>
-        <div className="rating">
-          <FaStar className="star-icon" />
-          {provider.rating ? provider.rating : "4.5"} ({provider.reviews ? provider.reviews : "120"} reviews)
-        </div>
         <p className="category-info"><FaToolbox /> <b>{provider.category}</b></p>
         <p className="distance">
           <FaMapMarkerAlt color="#cf1616ff" className="map-icon" /> {
@@ -242,25 +358,37 @@ const handleConnect = (provider, bookingDate, selectedServicesFromModal) => {
             })()
           }
         </p>
-        
         <p className="contact-info"><FaPhone /> {provider.phone}</p>
         <p className="contact-info"><FaEnvelope /> {provider.email}</p>
-        {showBookingDate && (
-          <div className="booking-date">
-            <FaCalendarAlt /> {provider.bookingDate}
+        {booking && (
+          <>
+            <div className="booking-date">
+              <FaCalendarAlt /> {booking.bookingDate}
+              <FaClock /> {booking.timeSlot}
+            </div>
+          </>
+        )}
+        {/* Status display */}
+        {booking && booking.status && (
+          <div className="card-info-item accepted-status">
+            Status:
+            <span
+              className={`accepted-status-label status-${booking.status.toLowerCase().replace(/ /g, "-")}`}
+            >
+              {booking.status}
+            </span>
           </div>
         )}
       </div>
       <button
         className="connect-button"
-        onClick={() => handleSeeDetails(provider)}
+        onClick={onSeeDetails}
         disabled={provider.available === false}
       >
         {provider.available === false ? 'Currently Unavailable' : 'See Details'}
       </button>
     </div>
   );
-
 
 
   const ProviderCard = ({ provider, showBookingDate }) => (
@@ -395,8 +523,8 @@ const handleConnect = (provider, bookingDate, selectedServicesFromModal) => {
               <div style={{ margin: "2em 0" }}>
                 <MapContainer
                   center={[
-                    filteredProviders[0]?.lat || 20, 
-                    filteredProviders[0]?.lng || 80
+                    homeProviders[0]?.lat || 20,
+                    homeProviders[0]?.lng || 80
                   ]}
                   zoom={4}
                   style={{ height: '400px', width: '100%', borderRadius: '1em' }}
@@ -405,7 +533,7 @@ const handleConnect = (provider, bookingDate, selectedServicesFromModal) => {
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                     attribution="&copy; OpenStreetMap contributors"
                   />
-                  {filteredProviders.map((provider) =>
+                  {homeProviders.map((provider) =>
                     provider.lat && provider.lng ? (
                       <Marker key={provider.id} position={[provider.lat, provider.lng]}>
                         <Popup>
@@ -432,11 +560,11 @@ const handleConnect = (provider, bookingDate, selectedServicesFromModal) => {
             </div>
             
             <div>
-              {connectedProvider && otherProviders.length > 0 && (
+              {connectedProvider && homeProviders.length > 0 && (
                 <h2 className="dashboard-header-bold-white" style={{ fontSize: '1.25rem', marginBottom: '1rem' }}>Other Services</h2>
               )}
               <div className="providers-grid">
-                {filteredProviders.map(provider => (
+                {homeProviders.map(provider => (
                   <ProviderCard key={provider.id} provider={provider} />
                 ))}
               </div>
@@ -448,19 +576,52 @@ const handleConnect = (provider, bookingDate, selectedServicesFromModal) => {
           <div className="bookings-page">
             <h2 className="dashboard-header-bold-white">Current Bookings</h2>
             <div className="providers-grid">
-              {connectedProvider ? (
-                <WideProviderCard provider={connectedProvider} showBookingDate />
-              ) : (
-                <div className="no-bookings-text">
-                  No current bookings.
-                </div>
-              )}
+              {customerBookings
+                .filter(booking => booking.status === "PENDING" || booking.status === "CONFIRMED" || booking.status === "IN_PROGRESS")
+                .map((booking, idx) => {
+                  const provider = serviceProviders.find(p => p.id === booking.providerId);
+                  if (!provider) return null; // skip if provider not found
+                  return (
+                    <WideProviderCard
+                      key={booking.bookingId || idx}
+                      provider={provider}
+                      booking={booking}
+                      onSeeDetails={() => {
+                        setModalProvider(provider);
+                        setShowModal(true);
+                        setModalBooking(booking); // new state to hold booking info
+                      }}
+                    />
+                  );
+                })
+              }
             </div>
             <h2 className="dashboard-header-bold-white">Past Bookings</h2>
             <div className="providers-grid">
-              <div className="no-bookings-text">
-                No past bookings.
-              </div>
+              {customerBookings.filter(booking => booking.status === "COMPLETED" || booking.status === "CANCELLED").length === 0 ? (
+                <div className="no-bookings-text">
+                  No past bookings.
+                </div>
+              ) : (
+                customerBookings
+                .filter(booking => booking.status === "COMPLETED" || booking.status === "CANCELLED")
+                .map((booking, idx) => {
+                  const provider = serviceProviders.find(p => p.id === booking.providerId);
+                  if (!provider) return null; // skip if provider not found
+                  return (
+                    <WideProviderCard
+                      key={booking.bookingId || idx}
+                      provider={provider}
+                      booking={booking}
+                      onSeeDetails={() => {
+                        setModalProvider(provider);
+                        setShowModal(true);
+                        setModalBooking(booking); // new state to hold booking info
+                      }}
+                    />
+                  );
+                })
+              )}
             </div>
           </div>
         )}
@@ -468,6 +629,8 @@ const handleConnect = (provider, bookingDate, selectedServicesFromModal) => {
         {showModal && (
           <ProviderModal
             provider={modalProvider}
+            booking={modalBooking}             // Pass booking object!
+            viewingBooking={!!modalBooking}
             onClose={handleCloseModal}
             selectedServices={selectedServices}
             setSelectedServices={setSelectedServices}
@@ -477,28 +640,55 @@ const handleConnect = (provider, bookingDate, selectedServicesFromModal) => {
           />
         )}
 
+        {/* Profile (same as before) */}
         {activePage === 'profile' && (
           <div className="profile-page">
-            <div className="profile-info-box">
-              <div className="profile-info-left">
-                <FaUserCircle size={90} />
-              </div>
+            {/* Section 1: Profile Details */}
+            <div className="profile-info-box wide-profile-box">
               <div className="profile-info-right">
+                <h2 className="profile-reviews-heading" style={{fontSize: '1.33rem', marginBottom: '0.7rem'}}>Profile Details</h2>
                 <div className="profile-info-item"><strong>Name:</strong> {currentUser.name}</div>
                 <div className="profile-info-item"><strong>Email:</strong> {currentUser.email}</div>
+                {/* Phone */}
                 <div className="profile-info-item phone-box-wide">
                   <label htmlFor="phone"><strong>Phone Number:</strong></label>
                   <input
                     id="phone"
                     type="tel"
+                    disabled={!isEditingPhone}
                     placeholder="Add phone number"
                     value={phoneInput}
                     onChange={e => setPhoneInput(e.target.value)}
                   />
-                  <button className="save-phone-button" onClick={handlePhoneSave}>Save</button>
+                  {phoneInput.length !== 10 && isEditingPhone && (
+                    <span style={{ color: 'red', fontSize: '0.96rem', marginLeft: '0.6rem' }}>Phone number must be 10 digits</span>
+                  )}
+                </div>
+                
+                
+                {/* Edit & Save Buttons */}
+                <div style={{display: 'flex', gap: '1rem', marginTop: '1rem'}}>
+                  <button
+                    className="accept-request-btn"
+                    style={{background: '#6b46c1'}}
+                    onClick={() => setIsEditingPhone(true)}
+                    disabled={isEditingPhone}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    className="save-phone-button"
+                    style={{background:'#2b6cb0'}}
+                    onClick={handlePhoneSave}
+                    disabled={!isEditingPhone || phoneInput.length !== 10}
+                  >
+                    Save
+                  </button>
                 </div>
               </div>
             </div>
+
+
             <div className="profile-actions-box">
               <button className="profile-wide-action-btn">
                 <FaQuestionCircle className="profile-action-icon" /> Help
