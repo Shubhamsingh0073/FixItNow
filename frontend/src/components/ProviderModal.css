@@ -168,15 +168,28 @@
 
 /* Close button */
 .modal-close-btn {
-    background: none;
-    border: none;
-    font-size: 2rem;
-    color: #6b46c1;
-    cursor: pointer;
-    position: absolute;
-    right: 1.2rem;
-    top: 1.2rem;
+  position: absolute;
+  top: 10px;
+  right: 15px;
+  background: #ffffff;
+  border: none;
+  border-radius: 50%;
+  font-size: 22px;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.2);
+  z-index: 9999; /* 🔥 ensures it's above everything else */
+  width: 35px;
+  height: 35px;
+  line-height: 35px;
+  text-align: center;
+  /* transition: background 0.2s; */
 }
+
+.modal-close-btn:hover {
+  background: #f0f0f0;
+}
+
 
 /* Provider name */
 .modal-provider-name {

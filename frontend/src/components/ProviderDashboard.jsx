@@ -3,6 +3,7 @@ import { FaMapMarkerAlt, FaUserCircle, FaPhone, FaEnvelope, FaHome, FaCalendarAl
 import './ProviderDashboard.css';
 import CustomerWideCard from './CustomerWideCard';
 
+
 // Mock data for customers
 const mockCustomers = [
   { id: 1, name: 'Alice Johnson', phone: '+1234567890', email: 'alice@email.com', category: 'Plumbing' },
