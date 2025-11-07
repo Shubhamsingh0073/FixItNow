@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { FaMapMarkerAlt, FaUserCircle, FaPhone, FaEnvelope, FaHome, FaCalendarAlt, FaSignOutAlt, FaQuestionCircle, FaRegComments, FaEdit, FaTrash, FaPlus, FaCheck, FaTimes, FaClock } from 'react-icons/fa';
+import { FaMapMarkerAlt, FaUserCircle, FaPhone, FaEnvelope, FaHome, FaCalendarAlt, FaSignOutAlt, FaQuestionCircle, FaRegComments, FaEdit, FaTrash, FaPlus, FaCheck, FaTimes, FaClock, FaChartArea, FaFacebookMessenger } from 'react-icons/fa';
 import './ProviderDashboard.css';
 import CustomerWideCard from './CustomerWideCard';
+import ChatPanel from './ChatPanel';
 
 
 // Mock data for customers
@@ -215,6 +216,10 @@ const ProviderDashboard = () => {
 
 
   const [providerBookings, setProviderBookings] = useState([]);
+  const [conversations, setConversations] = useState([]); // { peerId, peerName, lastMessage }
+  const [selectedPeer, setSelectedPeer] = useState(null);
+  const [selectedPeerName, setSelectedPeerName] = useState('');
+  const [loadingConversations, setLoadingConversations] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -253,8 +258,8 @@ const ProviderDashboard = () => {
           return res.json();
         })
         .then(data => {
-          // Backend should return { name, email, phone }
-          setUserData({ name: data.name, email: data.email, phone: data.phone });
+          // Backend should return { id, name, email, phone }
+          setUserData({ id: data.id, name: data.name, email: data.email, phone: data.phone });
           setPhoneInput(data.phone || ''); // If you use a separate state for phone input
         })
         .catch(err => {
@@ -350,6 +355,39 @@ const ProviderDashboard = () => {
     }
 
   }, []);
+
+  // Load conversations when Chat page becomes active
+  useEffect(() => {
+    const loadConversations = async () => {
+      const providerId = userData?.id || localStorage.getItem('userId');
+      if (!providerId) return;
+      setLoadingConversations(true);
+      try {
+        const url = `/api/chat/conversations?userId=${encodeURIComponent(providerId)}`;
+        const res = await fetch(url);
+        if (!res.ok) {
+          setConversations([]);
+          return;
+        }
+        const arr = await res.json();
+        // arr expected: [{ peerId, peerName, lastMessage, lastAt }, ...]
+        const convs = (arr || []).map(c => ({
+          peerId: c.peerId || c.peer_id || c.peerID,
+          peerName: c.peerName || c.peer_name || c.peerName || c.peerName,
+          lastMessage: c.lastMessage || c.last_message || '',
+          lastAt: c.lastAt || c.last_at || ''
+        }));
+        setConversations(convs);
+      } catch (err) {
+        console.error('Failed loading conversations', err);
+        setConversations([]);
+      } finally {
+        setLoadingConversations(false);
+      }
+    };
+
+    if (activePage === 'Chat') loadConversations();
+  }, [activePage, userData]);
 
   // Accept request
   const handleAcceptRequest = (customer) => {
@@ -597,6 +635,9 @@ const ProviderDashboard = () => {
           <button className={activePage === 'profile' ? 'active' : ''} onClick={() => setActivePage('profile')}>
             <FaUserCircle /> Profile
           </button>
+          <button className={activePage === 'Chat' ? 'active' : ''} onClick={() => setActivePage('Chat')}>
+            <FaFacebookMessenger /> Chat
+          </button>
         </nav>
         <div className="sidebar-bottom">
           <button className="logout-button" onClick={handleLogout}>
@@ -665,6 +706,7 @@ const ProviderDashboard = () => {
                   showDropdown={false}
                   currentBookingStatus={booking.status}
                   handleBookingStatusChange={handleBookingStatusChange}
+                  providerId={userData?.id || localStorage.getItem('userId')}
                 />
               ))
             }
@@ -687,6 +729,56 @@ const ProviderDashboard = () => {
             </div>
           </div>
         )}
+        {/* Chat Page */}
+        {activePage === 'Chat' && (
+          <div className="chat-page" style={{ display: 'flex', gap: 16, alignItems: 'stretch' }}>
+            <div style={{ width: 320, minHeight: 400, background: '#fff', borderRadius: 8, padding: 12, boxShadow: '0 4px 18px rgba(0,0,0,0.06)', overflowY: 'auto' }}>
+              <h3 style={{ marginTop: 0, marginBottom: 12 }}>Conversations</h3>
+              {loadingConversations ? (
+                <div style={{ color: '#666' }}>Loading...</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {conversations.length === 0 ? (
+                    <div style={{ color: '#999' }}>No conversations yet.</div>
+                  ) : (
+                    conversations.map(conv => (
+                      <button key={conv.peerId}
+                        onClick={() => { setSelectedPeer(conv.peerId); setSelectedPeerName(conv.peerName || conv.peerId); }}
+                        style={{
+                          textAlign: 'left',
+                          padding: '10px',
+                          borderRadius: 8,
+                          border: selectedPeer === conv.peerId ? '2px solid #6156f8' : '1px solid #eee',
+                          background: selectedPeer === conv.peerId ? '#f7f5ff' : '#fff',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <div style={{ fontWeight: 600 }}>{conv.peerName || conv.peerId}</div>
+                        <div style={{ fontSize: 12, color: '#666', marginTop: 6, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{conv.lastMessage}</div>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div style={{ flex: 1, minHeight: 400, background: '#fff', borderRadius: 8, padding: 12, boxShadow: '0 4px 18px rgba(0,0,0,0.06)', display: 'flex', flexDirection: 'column' }}>
+              {selectedPeer ? (
+                <ChatPanel
+                  currentUserId={userData?.id || localStorage.getItem('userId')}
+                  peerId={selectedPeer}
+                  peerName={selectedPeerName}
+                  onBack={() => setSelectedPeer(null)}
+                />
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, color: '#666' }}>
+                  <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>No conversation selected</div>
+                  <div>Select a person from the left to view and reply to messages.</div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Bookings */}
         {activePage === 'bookings' && (
@@ -704,6 +796,7 @@ const ProviderDashboard = () => {
                     showDropdown={true}
                     currentBookingStatus={booking.status}
                     handleBookingStatusChange={newStatus => handleBookingStatusChange(booking.bookingId, newStatus)}
+                    providerId={userData?.id || localStorage.getItem('userId')}
                   />
                 ))}
             </div>

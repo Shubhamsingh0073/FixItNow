@@ -4,7 +4,8 @@ import "./ProviderModal.css";
 import ExternalChatPanel from "./ChatPanel";
 import Reviews from "./Reviews";
 
-// No local chat panel implementation needed - using ExternalChatPanel
+// Use ExternalChatPanel (imported above) for chat UI and WebSocket connection.
+// ProviderModal will render <ExternalChatPanel currentUserId={customerId} peerId={provider.id} /> when rightPanel==='chat'.
 
 
 function formatForInput(date) {

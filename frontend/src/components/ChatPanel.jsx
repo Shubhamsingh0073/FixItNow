@@ -57,28 +57,12 @@ const ChatPanel = ({ currentUserId, peerId, peerName = "Peer", onBack }) => {
       }
     };
 
-    ws.onclose = (event) => {
-      console.log('WebSocket closed:', event.reason);
+    ws.onclose = () => {
       setConnected(false);
-      setStatus("Disconnected - Retrying in 5s");
-      // Try to reconnect after 5 seconds
-      setTimeout(() => {
-        if (!wsRef.current || wsRef.current.readyState === WebSocket.CLOSED) {
-          const newWs = new WebSocket(url);
-          wsRef.current = newWs;
-          // Set up the same event handlers for the new connection
-          newWs.onopen = ws.onopen;
-          newWs.onmessage = ws.onmessage;
-          newWs.onclose = ws.onclose;
-          newWs.onerror = ws.onerror;
-        }
-      }, 5000);
+      setStatus("Disconnected");
     };
 
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
-      setStatus("Connection Error");
-    };
+    ws.onerror = () => setStatus("Error");
 
     return () => {
       if (ws && ws.readyState === WebSocket.OPEN) ws.close();

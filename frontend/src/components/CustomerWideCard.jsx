@@ -2,7 +2,8 @@ import React from "react";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-import { FaMapMarkerAlt, FaPhone, FaEnvelope, FaCalendarAlt, FaClock } from "react-icons/fa";
+import { FaMapMarkerAlt, FaPhone, FaEnvelope, FaCalendarAlt, FaClock, FaCommentDots } from "react-icons/fa";
+import ExternalChatPanel from "./ChatPanel";
 
 // Fix leaflet icon issues
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
@@ -21,8 +22,10 @@ const CustomerWideCard = ({
   showMap = true,
   showDropdown = false,
   currentBookingStatus,
-  handleBookingStatusChange
+  handleBookingStatusChange,
+  providerId
 }) => {
+  const [showChat, setShowChat] = React.useState(false);
   const totalPrice = customer.bookedServices
     ? Object.values(customer.bookedServices).reduce((sum, price) => sum + price, 0)
     : 0;
@@ -99,8 +102,8 @@ const CustomerWideCard = ({
           </div>
         )}
       </div>
-      {/* Status and Total row at the bottom */}
-      <div className="status-total-row" style={{ marginTop: "1em", width: "100%" }}>
+  {/* Status and Total row at the bottom */}
+  <div className="status-total-row" style={{ marginTop: "1em", width: "100%", display: 'flex', alignItems: 'center', gap: 12 }}>
         {showDropdown && (
           <div className="booking-status-dropdown">
             <label htmlFor="booking-status-select"><strong>Status:</strong></label>
@@ -127,10 +130,45 @@ const CustomerWideCard = ({
             </div>
         )}
 
+        <button
+          className="chat-button"
+          onClick={() => setShowChat(true)}
+          style={{
+            marginLeft: 'auto',
+            background: '#6156f8',
+            color: 'white',
+            border: 'none',
+            borderRadius: '16px',
+            padding: '8px 14px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            cursor: 'pointer'
+          }}
+        >
+          <FaCommentDots /> Chat
+        </button>
+
         <div className="booked-services-total">
           <span className="total-label">Total:</span>
           <span className="total-value">₹{totalPrice}</span>
         </div>
+      
+      {showChat && (
+        <div className="chat-overlay" style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1200
+        }}>
+          <div style={{ width: '90%', maxWidth: 800, maxHeight: '90vh', borderRadius: 8, overflow: 'hidden' }}>
+            <ExternalChatPanel
+              currentUserId={providerId || localStorage.getItem('userId')}
+              peerId={customer.customerId || customer.userId || customer.id}
+              peerName={customer.customerName || customer.name}
+              onBack={() => setShowChat(false)}
+            />
+          </div>
+        </div>
+      )}
       </div>
     </div>
   );
