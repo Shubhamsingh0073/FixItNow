@@ -20,19 +20,25 @@ public class ServicesManager {
 
     @Autowired
     private ServicesRepository sr;
-
+    
+ // Replace existing method in UsersManager
     public String generateNextServiceId() {
-        String maxId = sr.findMaxServiceId(); // e.g., "S17"
-        int nextNum = 1;
-        if (maxId != null && maxId.startsWith("S")) {
-            try {
-                nextNum = Integer.parseInt(maxId.substring(1)) + 1;
-            } catch (NumberFormatException e) {
-                nextNum = 1;
+        int max = 0;
+        // load all users (lightweight for modest user counts). If you prefer, add a repository query to return only ids.
+        for (Services u : sr.findAll()) {
+            String id = u.getId();
+            if (id != null && id.startsWith("S")) {
+                try {
+                    int n = Integer.parseInt(id.substring(1));
+                    if (n > max) max = n;
+                } catch (NumberFormatException ignored) {
+                    // ignore non-numeric suffixes
+                }
             }
         }
-        return "S" + nextNum;
+        return "S" + (max + 1);
     }
+    
 
     @Transactional
     public Services createDefaultServiceForProvider(Users provider) {
@@ -42,7 +48,6 @@ public class ServicesManager {
         service.setCategory("Default Category");
         service.setSubcategory("Default Subcategory");
         service.setDescription("Default description for new provider");
-        service.setPrice(new BigDecimal("0.00"));
         service.setAvailability("{\"Monday\": \"9-5\"}");
         return sr.save(service);
     }

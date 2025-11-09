@@ -239,25 +239,18 @@
     font-weight: 600;
 }
 
-.status.completed {
-    background: #16a34a;
-}
-
-.status.inprogress {
-    background: #2563eb;
+.status.rejected {
+    background: #fa3737;
 }
 
 .status.pending {
-    background: #f59e0b;
+    background: #faa91e;
 }
 
-.status.active {
-    background: #38a169;
+.status.approved {
+    background: #24a560;
 }
 
-.status.inactive {
-    background: #f59e0b;
-}
 
 /* Complaints */
 .complaints-list {
@@ -321,4 +314,167 @@
         grid-template-columns: 1fr;
         gap: 14px;
     }
+}
+
+.admin-connect-button {
+    margin-top: auto;
+    /* ensures the button is pushed to the bottom of the card */
+    width: 80%;
+    padding: 0.2rem;
+    background: linear-gradient(135deg, #6b46c1, #2b6cb0);
+    color: white;
+    border: none;
+    border-radius: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.3s;
+    font-size: 1rem;
+}
+
+.admin-connect-button:hover {
+    background: #805ad5;
+}
+
+.a-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Modal content */
+.a-modal-content {
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(135deg, #6b46c1, #2b6cb0);
+    padding: 0.5rem 0.5rem 0.5rem 0.5rem;
+    border-radius: 1rem;
+    width: 516px;
+    min-height: 220px;
+    max-height: 97%;
+    position: relative;
+    box-shadow: 0 4px 24px rgba(80, 36, 143, 0.18);
+    z-index: 100000;
+}
+
+/* Close button */
+.a-modal-close-btn {
+    background: none;
+    border: none;
+    font-size: 2rem;
+    color: #443e49;
+    cursor: pointer;
+    position: absolute;
+    right: 1.8rem;
+    top: 1rem;
+}
+
+.a-modal-left {
+    width: 500px;
+    min-height: 220px;
+    max-height: 100%;
+    padding: 2rem 1.5rem;
+    border-radius: 0.75rem;
+    color: #fff;
+    background: #fcf7f7;
+    /* matches your dashboard */
+    box-shadow: 0 6px 18px rgba(80, 36, 143, 0.09);
+    display: flex;
+    flex-direction: column;
+    gap: 0rem;
+}
+
+.a-card-profile {
+    display: flex;
+    flex-direction: column;
+    font-size: 0.95rem;
+    color: #fffaf5;
+    margin-top: 0.5rem;
+    margin-bottom: 1.2rem;
+}
+
+.a-card-profile p{
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    margin: 0;
+}
+
+.a-modal-provider-name-left {
+    margin-left: 0.5em;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #332f2a;
+    text-align: center;
+    letter-spacing: 0.5px;
+
+}
+
+
+
+.a-modal-contact-row {
+    display: flex;
+    flex-direction: column;
+    font-size: 1rem;
+    color: #332f2a;
+    margin-top: 0.5rem;
+    margin-bottom: 1.2rem;
+}
+
+.a-modal-contact-row p {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    margin: 0;
+}
+
+.a-modal-detail-value-left {
+    word-break: break-word;
+    color: #332f2a;
+    font-size: 0.9em;
+    font-weight: 450;
+    margin-top: 0em;
+    align-items: center;
+}
+
+
+.a-modal-location-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5em;
+    font-size: 1rem;
+    margin-top: 0.5rem;
+    margin-bottom: 0.3rem;
+    color: #332f2a;
+}
+
+.a-modal-map-icon {
+    vertical-align: middle;
+    margin-right: 6px;
+}
+
+/* Reuse modal overlay/content classes from other modals */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+/* This uses the same modal-content base used elsewhere */
+.modal-content {
+    background: #fff;
+    border-radius: 0.75rem;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+    max-height: 90vh;
+    overflow: auto;
 }

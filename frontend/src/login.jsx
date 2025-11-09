@@ -37,6 +37,11 @@ const Login = () => {
         [name]: '',
       }));
     }
+
+    // if general submit error exists, clear it when user types
+    if (errors.submit) {
+      setErrors((prev) => ({ ...prev, submit: '' }));
+    }
   };
 
   // Toggle password show/hide
@@ -90,13 +95,61 @@ const Login = () => {
       const data = await response.json();
 
       if (!response.ok) {
-        setErrors({ submit: data.message || 'Invalid email or password or role' });
+        // Map backend message to field-specific errors where possible
+        const serverMessage = (data?.message || data?.error || '').toString().toLowerCase();
+        if (serverMessage.includes('email')) {
+          setErrors({ email: data.message || 'Invalid email' });
+        } else if (serverMessage.includes('password')) {
+          setErrors({ password: data.message || 'Invalid password' });
+        } else if (serverMessage.includes('role') || serverMessage.includes('provider')) {
+          setErrors({ submit: data.message || 'Invalid role' });
+        } 
         setLoading(false);
         return;
       }
 
-      // Store token (optional)
-      localStorage.setItem('token', data.token);
+      // If user selected provider role, check verification status returned by backend.
+      // Backend (user_login.java) includes a "verified" field when requested role is PROVIDER:
+      // response.put("verified", service.getVerified().name());
+      if (formData.userType === 'provider') {
+        // Normalize verification status from response (could be in data.verified or nested)
+        const rawStatus = (data?.verified || data?.user?.verified || data?.status || '').toString();
+        const status = rawStatus.trim().toLowerCase();
+
+        // If backend didn't include a status, treat as pending for safety (or you can allow)
+        if (!status) {
+          setErrors({ submit: 'Verification in progress. Wait for Admin approval.' });
+          setLoading(false);
+          return;
+        }
+
+        if (status.includes('pending')) {
+          setErrors({ submit: 'Verification in progress. Wait for Admin approval.' });
+          setLoading(false);
+          return; // do not store token or navigate
+        }
+
+        if (status.includes('reject') || status.includes('rejected') || status.includes('declined')) {
+          setErrors({ submit: 'Verification rejected, cannot login.' });
+          setLoading(false);
+          return; // do not store token or navigate
+        }
+
+        // allow login to continue only when approved/active
+        if (!(status.includes('approve') || status.includes('approved') || status.includes('active'))) {
+          // unknown status: be conservative
+          setErrors({ submit: 'Verification in progress. Wait for Admin approval.' });
+          setLoading(false);
+          return;
+        }
+      }
+
+      // At this point:
+      // - non-provider users are accepted, or
+      // - provider users are approved and can proceed.
+      if (data.token) {
+        localStorage.setItem('token', data.token);
+      }
 
       // Navigate based on role
       switch (formData.userType) {

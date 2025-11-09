@@ -191,7 +191,7 @@ const ProviderModal = ({
 
   const overallRating = providerReviews.length > 0
     ? (providerReviews.reduce((sum, r) => sum + r.rating, 0) / providerReviews.length).toFixed(2)
-    : "No rating";
+    : "0.0";
 
   const totalReviews = providerReviews.length;
 

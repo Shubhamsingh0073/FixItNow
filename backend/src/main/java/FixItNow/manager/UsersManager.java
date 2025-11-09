@@ -23,14 +23,22 @@ public class UsersManager {
 	@Autowired
     ServicesRepository sr;
 	
+	// Replace existing method in UsersManager
 	public String generateNextUserId() {
-	    String umaxId = ur.findMaxUserId(); // e.g., "U17"
-	    int unextNum = 1;
-	    if (umaxId != null && umaxId.startsWith("U")) {
-	        unextNum = Integer.parseInt(umaxId.substring(1)) + 1;
+	    int max = 0;
+	    // load all users (lightweight for modest user counts). If you prefer, add a repository query to return only ids.
+	    for (Users u : ur.findAll()) {
+	        String id = u.getId();
+	        if (id != null && id.startsWith("U")) {
+	            try {
+	                int n = Integer.parseInt(id.substring(1));
+	                if (n > max) max = n;
+	            } catch (NumberFormatException ignored) {
+	                // ignore non-numeric suffixes
+	            }
+	        }
 	    }
-	    return "U" + unextNum;
-	
+	    return "U" + (max + 1);
 	}
 	
 	public String AddUsers(Users u)
@@ -48,8 +56,7 @@ public class UsersManager {
             service.setProvider(savedUsers); // links provider_id to users.id
             service.setCategory("Default Category");         // <-- Set a default value
             service.setSubcategory("Default Subcategory");   // <-- Set a default value
-            service.setDescription("Default service description"); // If nullable, can omit
-            service.setPrice(BigDecimal.ZERO);               // <-- Set a default value
+            service.setDescription("Default service description"); // If nullable, can omit             // <-- Set a default value
             service.setAvailability("{}");      
             
             sr.save(service);

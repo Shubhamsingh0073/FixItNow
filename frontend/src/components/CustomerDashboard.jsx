@@ -368,7 +368,8 @@ const handleConnect = (provider, bookingDate, selectedServicesFromModal, selecte
             </div>
           </>
         )}
-        {/* Status display */}
+      </div>
+      {/* Status display */}
         {booking && booking.status && (
           <div className="card-info-item accepted-status">
             Status:
@@ -379,7 +380,6 @@ const handleConnect = (provider, bookingDate, selectedServicesFromModal, selecte
             </span>
           </div>
         )}
-      </div>
       <button
         className="connect-button"
         onClick={onSeeDetails}

@@ -17,6 +17,10 @@ public class Services {
 
     @Column(nullable = false)
     private String category;
+    
+    @Enumerated(EnumType.STRING)
+    @Column(name = "verified", nullable = false)
+    private ServicesVerified verified = ServicesVerified.PENDING;
 
     @Column(columnDefinition = "TEXT") 
     private String subcategory;
@@ -24,8 +28,6 @@ public class Services {
     @Lob
     private String description;
 
-    @Column(nullable = false, precision = 10, scale = 2)
-    private BigDecimal price;
 
     @Column(columnDefinition = "TEXT")
     private String availability; // JSON stored as String
@@ -56,6 +58,15 @@ public class Services {
     public void setCategory(String category) {
         this.category = category;
     }
+    
+    public ServicesVerified getVerified() { 
+    	return verified; 
+    }
+    
+    public void setVerified(ServicesVerified verified) { 
+    	this.verified = verified; 
+    }
+
 
     public String getSubcategory() {
         return subcategory;
@@ -71,14 +82,6 @@ public class Services {
 
     public void setDescription(String description) {
         this.description = description;
-    }
-
-    public BigDecimal getPrice() {
-        return price;
-    }
-
-    public void setPrice(BigDecimal price) {
-        this.price = price;
     }
 
     public String getAvailability() {

@@ -31,19 +31,23 @@ public class BookingManager {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     /*Generate the next booking id based on the repository's maximum id.*/
+ // Replace existing method in UsersManager
     public String generateNextBookingId() {
-        String maxId = br.findMaxBookingId();
-        int nextNum = 1;
-        if (maxId != null && maxId.startsWith("B")) {
-            try {
-                nextNum = Integer.parseInt(maxId.substring(1)) + 1;
-            } catch (NumberFormatException e) {
-                nextNum = 1;
+        int max = 0;
+        // load all users (lightweight for modest user counts). If you prefer, add a repository query to return only ids.
+        for (Booking u : br.findAll()) {
+            String id = u.getId();
+            if (id != null && id.startsWith("B")) {
+                try {
+                    int n = Integer.parseInt(id.substring(1));
+                    if (n > max) max = n;
+                } catch (NumberFormatException ignored) {
+                    // ignore non-numeric suffixes
+                }
             }
         }
-        return "B" + nextNum;
+        return "B" + (max + 1);
     }
-    
     
     
     @Transactional
