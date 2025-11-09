@@ -706,6 +706,7 @@ const ProviderDashboard = () => {
                   showDropdown={false}
                   currentBookingStatus={booking.status}
                   handleBookingStatusChange={handleBookingStatusChange}
+                   showChatButton={false}
                   providerId={userData?.id || localStorage.getItem('userId')}
                 />
               ))
@@ -797,6 +798,7 @@ const ProviderDashboard = () => {
                     currentBookingStatus={booking.status}
                     handleBookingStatusChange={newStatus => handleBookingStatusChange(booking.bookingId, newStatus)}
                     providerId={userData?.id || localStorage.getItem('userId')}
+                    showChatButton={false}
                   />
                 ))}
             </div>

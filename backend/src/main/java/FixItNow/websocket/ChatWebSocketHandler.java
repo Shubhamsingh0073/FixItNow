@@ -128,3 +128,35 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 		return null;
 	}
 }
+
+////inside ChatWebSocketHandler.java (update your afterConnectionEstablished / onOpen)
+//@Override
+//public void afterConnectionEstablished(WebSocketSession session) throws Exception {
+// URI uri = session.getUri();
+// String query = (uri == null) ? null : uri.getQuery();
+//
+// // Try several keys in order of preference
+// String userId = parseQueryParam(query, "userId");
+// if (userId == null || userId.isBlank()) {
+//     userId = parseQueryParam(query, "customerId");
+// }
+// if (userId == null || userId.isBlank()) {
+//     userId = parseQueryParam(query, "providerId");
+// }
+// if (userId == null || userId.isBlank()) {
+//     // No userId -> send an error and close the connection
+//     var err = Map.of("error", "missing userId (query param 'userId' or 'customerId' or 'providerId')");
+//     session.sendMessage(new TextMessage(objectMapper.writeValueAsString(err)));
+//     session.close(CloseStatus.BAD_DATA);
+//     return;
+// }
+//
+// // store session
+// sessions.put(userId, session);
+//
+// // Log for debugging
+// System.out.println("WebSocket connected: userId=" + userId + " sessionId=" + session.getId());
+// // Notify client if you want
+// var payload = Map.of("system", true, "message", "connected", "userId", userId);
+// session.sendMessage(new TextMessage(objectMapper.writeValueAsString(payload)));
+//}

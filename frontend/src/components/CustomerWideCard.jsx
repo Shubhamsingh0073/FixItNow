@@ -23,7 +23,8 @@ const CustomerWideCard = ({
   showDropdown = false,
   currentBookingStatus,
   handleBookingStatusChange,
-  providerId
+  providerId,
+  showChatButton = true
 }) => {
   const [showChat, setShowChat] = React.useState(false);
   const totalPrice = customer.bookedServices
@@ -130,24 +131,26 @@ const CustomerWideCard = ({
             </div>
         )}
 
-        <button
-          className="chat-button"
-          onClick={() => setShowChat(true)}
-          style={{
-            marginLeft: 'auto',
-            background: '#6156f8',
-            color: 'white',
-            border: 'none',
-            borderRadius: '16px',
-            padding: '8px 14px',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            cursor: 'pointer'
-          }}
-        >
-          <FaCommentDots /> Chat
-        </button>
+        {showChatButton && (
+          <button
+            className="chat-button"
+            onClick={() => setShowChat(true)}
+            style={{
+              marginLeft: 'auto',
+              background: '#6156f8',
+              color: 'white',
+              border: 'none',
+              borderRadius: '16px',
+              padding: '8px 14px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              cursor: 'pointer'
+            }}
+          >
+            <FaCommentDots /> Chat
+          </button>
+        )}
 
         <div className="booked-services-total">
           <span className="total-label">Total:</span>
