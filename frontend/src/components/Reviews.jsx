@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import "./Reviews.css";
 import { FaArrowLeft, FaStar } from "react-icons/fa";
 
-const Reviews = ({ provider, onBack, bookingId }) => {
+const Reviews = ({ provider, onBack, bookingId, showAddButton = true }) => {
   // Add review state
   const [showAddReview, setShowAddReview] = useState(false);
   const [newReviewText, setNewReviewText] = useState("");
@@ -54,14 +54,14 @@ const Reviews = ({ provider, onBack, bookingId }) => {
         body: JSON.stringify(reviewPayload)
       });
       if (!response.ok) throw new Error("Failed to save review");
-      // For instant UI feedback, add to list (optionally refresh from backend again)
+      // instant UI feedback
       setReviews([
         ...reviews,
         {
           rating: newRating,
           provider_id: provider.id,
           comment: newReviewText,
-          author: "You"
+          customer_name: "You"
         }
       ]);
       setShowAddReview(false);
@@ -78,39 +78,49 @@ const Reviews = ({ provider, onBack, bookingId }) => {
         <button className="back-to-booking-btn" onClick={onBack}>
           <FaArrowLeft /> Back
         </button>
-        <button className="add-review-btn" onClick={() => setShowAddReview(true)}>
-          Add Review
-        </button>
+
+        {/* showAddButton controls whether to render the Add Review button */}
+        {showAddButton && (
+          <button className="add-review-btn" onClick={() => setShowAddReview(true)}>
+            Add Review
+          </button>
+        )}
       </div>
+
       <h2 className="reviews-title">Reviews & Ratings</h2>
+
       <div className="reviews-summary">
-        <div><b>Overall Rating:</b> {
-          providerReviews.length > 0
+        <div>
+          <b>Overall Rating:</b>{" "}
+          {providerReviews.length > 0
             ? (
-                (providerReviews.reduce((sum, r) => sum + r.rating, 0) / providerReviews.length).toFixed(2)
+                (providerReviews.reduce((sum, r) => sum + r.rating, 0) / providerReviews.length).toFixed(1)
               )
-            : "No rating"
-        } / 5</div>
+            : "0.0"
+          } / 5
+        </div>
         <div><b>Total Reviews:</b> {providerReviews.length}</div>
       </div>
+
       <div className="reviews-list-container">
         {loadingReviews ? (
           <div>Loading reviews...</div>
         ) : providerReviews.length === 0 ? (
           <div className="no-reviews-text">No reviews found.</div>
         ) : (
-        <ul className="reviews-list">
+          <ul className="reviews-list">
             {providerReviews.map((review, idx) => (
-                <li key={idx} className="review-item">
+              <li key={idx} className="review-item">
                 <b>{review.customer_name || "Anonymous"}</b>
                 <span className="review-rating"> ({review.rating}/5)</span><br />
                 <span>{review.comment}</span>
-                </li>
+              </li>
             ))}
-        </ul>
+          </ul>
         )}
       </div>
-      {showAddReview && (
+
+      {showAddReview && showAddButton && (
         <div className="add-review-modal">
           <h3>Add Review</h3>
           <div className="star-rating">

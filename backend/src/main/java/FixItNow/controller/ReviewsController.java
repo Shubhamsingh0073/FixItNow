@@ -76,62 +76,7 @@ public class ReviewsController {
         }
     }
 
-    /**
-     * GET /reviews/provider/me
-     * Returns reviews received by the authenticated provider.
-     */
-    @GetMapping("/provider/me")
-    public ResponseEntity<?> getReviewsForProvider(@RequestHeader(value = "Authorization", required = false) String authHeader) {
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Collections.singletonMap("message", "Missing or invalid Authorization header"));
-        }
-        String token = authHeader.substring(7);
-
-        String email = usersManager.validateToken(token);
-        if ("401".equals(email)) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Collections.singletonMap("message", "Token expired or invalid"));
-        }
-
-        Users provider = usersManager.getUserByEmail(email);
-        if (provider == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Collections.singletonMap("message", "Authenticated provider not found"));
-        }
-
-        List<Map<String, Object>> reviews = reviewsManager.getReviewsForProvider(provider);
-        return ResponseEntity.ok(reviews);
-    }
-
-    /**
-     * GET /reviews/customer/me
-     * Returns reviews written by the authenticated customer.
-     */
-    @GetMapping("/customer/me")
-    public ResponseEntity<?> getReviewsForCustomer(@RequestHeader(value = "Authorization", required = false) String authHeader) {
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Collections.singletonMap("message", "Missing or invalid Authorization header"));
-        }
-        String token = authHeader.substring(7);
-
-        String email = usersManager.validateToken(token);
-        if ("401".equals(email)) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Collections.singletonMap("message", "Token expired or invalid"));
-        }
-
-        Users customer = usersManager.getUserByEmail(email);
-        if (customer == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Collections.singletonMap("message", "Authenticated user not found"));
-        }
-
-        List<Map<String, Object>> reviews = reviewsManager.getReviewsForCustomer(customer);
-        return ResponseEntity.ok(reviews);
-    }
-    
+   
     
     @GetMapping("/all")
     public ResponseEntity<List<Map<String, Object>>> getAllReviewsSimple() {
@@ -139,16 +84,4 @@ public class ReviewsController {
         return ResponseEntity.ok(reviews);
     }
 
-    /**
-     * GET /reviews/booking/{bookingId}
-     * Returns reviews for a specific booking (no auth required, but you can add it if you prefer)
-     */
-    @GetMapping("/booking/{bookingId}")
-    public ResponseEntity<?> getReviewsForBooking(@PathVariable String bookingId) {
-        if (bookingId == null || bookingId.isBlank()) {
-            return ResponseEntity.badRequest().body(Collections.singletonMap("message", "bookingId is required"));
-        }
-        List<Map<String, Object>> reviews = reviewsManager.getReviewsForBooking(bookingId);
-        return ResponseEntity.ok(reviews);
-    }
 }

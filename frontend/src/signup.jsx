@@ -18,12 +18,39 @@ const SignUpPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  const [licenseFile, setLicenseFile] = useState(null);
+  const [licenseError, setLicenseError] = useState('');
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
       [name]: value
     }));
+  };
+
+  const handleFileChange = (e) => {
+    setLicenseError('');
+    const file = e.target.files?.[0];
+    if (!file) {
+      setLicenseFile(null);
+      return;
+    }
+
+    // Validate type and size (example: max 5MB)
+    if (file.type !== 'application/pdf') {
+      setLicenseError('Only PDF files are allowed.');
+      setLicenseFile(null);
+      return;
+    }
+    const MAX_BYTES = 5 * 1024 * 1024; // 5MB
+    if (file.size > MAX_BYTES) {
+      setLicenseError('File too large. Max 5MB.');
+      setLicenseFile(null);
+      return;
+    }
+
+    setLicenseFile(file);
   };
 
   const validateForm = () => {
@@ -56,8 +83,35 @@ const SignUpPage = () => {
       newErrors.confirmPassword = 'Passwords do not match';
     }
 
+    // NEW: If role is provider, require uploaded document
+    if (formData.role === 'PROVIDER') {
+      if (!licenseFile) {
+        // user requested exact message "document is required"
+        newErrors.license = 'Document is required';
+      }
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
+  };
+
+  // Replace the existing handleSubmit with this version and add the helper uploadDocument below it.
+
+  const uploadDocument = async (providerId, file) => {
+    const fd = new FormData();
+    fd.append('file', file); // backend expects part name "file"
+    const res = await fetch(`http://localhost:8087/users/${providerId}/document`, {
+      method: 'POST',
+      // do NOT set Content-Type header
+      body: fd
+      // optionally include Authorization header if your endpoint requires auth:
+      // headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: 'Upload failed' }));
+      throw new Error(err.message || `Upload failed (${res.status})`);
+    }
+    return res.json();
   };
 
   const handleSubmit = async (e) => {
@@ -66,7 +120,8 @@ const SignUpPage = () => {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:8087/users/signup', {
+      // Always send JSON to signup endpoint (two-step flow)
+      const signupResp = await fetch('http://localhost:8087/users/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -77,22 +132,44 @@ const SignUpPage = () => {
         })
       });
 
-      const data = await response.json();
+      const signupData = await signupResp.json();
 
-      if (!response.ok) {
-        setErrors({ submit: data.message || 'Signup failed. Please try again.' });
+      if (!signupResp.ok) {
+        setErrors({ submit: signupData.message || 'Signup failed. Please try again.' });
         setLoading(false);
         return;
       }
 
+      // If provider, upload document in second step
+      if (formData.role === 'PROVIDER') {
+        // backend returns userId in signup response (see controller)
+        const userId = signupData.userId || signupData.user_id || signupData.id;
+        if (!userId) {
+          // fallback: inform user that upload can't proceed automatically
+          setErrors({ submit: 'Signup succeeded but server did not return user id for upload.' });
+          setLoading(false);
+          return;
+        }
+
+        try {
+          await uploadDocument(userId, licenseFile);
+        } catch (uploadErr) {
+          // upload failed — you may want to inform user and let them retry upload
+          setErrors({ submit: uploadErr.message || 'Document upload failed. Please try again.' });
+          setLoading(false);
+          return;
+        }
+      }
+
+      // post-signup behavior
       if (formData.role === 'ADMIN') {
-        // Redirect to admin verification, pass email in location state
         navigate('/admin-verify', { state: { email: formData.email } });
       } else {
         alert('Registration successful! Please login to continue.');
         navigate('/login');
       }
     } catch (error) {
+      console.error('Signup error', error);
       setErrors({ submit: 'An error occurred. Please try again.' });
     } finally {
       setLoading(false);
@@ -104,7 +181,7 @@ const SignUpPage = () => {
       <div className="auth-card wider-auth-card">
         <div className="brand-section">
           <h1>Fix It Now</h1>
-          <p>Join our service & repair network today!!</p>
+          <p>Join our service & repair network today!</p>
         </div>
         <div className="form-section">
           <form onSubmit={handleSubmit}>
@@ -196,12 +273,49 @@ const SignUpPage = () => {
                 <div className="error-message">{errors.confirmPassword}</div>
               )}
             </div>
+
+              {/* New: Upload contractor license (only for PROVIDER) */}
+            {formData.role === 'PROVIDER' && (
+              <div className="form-group">
+                <label className="file-label">Upload Contractor License (PDF, max 5MB)</label>
+                <div className="input-wrapper file-input-wrapper">
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    onChange={handleFileChange}
+                    aria-label="Upload contractor license (PDF)"
+                  />
+                </div>
+                {licenseFile && (
+                  <div className="file-info">
+                    <span>{licenseFile.name}</span>
+                    <button
+                      type="button"
+                      className="remove-file-btn"
+                      onClick={() => { setLicenseFile(null); setLicenseError(''); }}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )}
+                {(errors.license || licenseError) && (
+                  <div className="error-message">{errors.license || licenseError}</div>
+                )}
+              </div>
+            )}
+
+
             {/* Role Selector */}
             <div className="role-selector flex-equal">
               <button
                 type="button"
                 className={`role-button ${formData.role === 'CUSTOMER' ? 'active' : ''}`}
-                onClick={() => setFormData({...formData, role: 'CUSTOMER'})}
+                onClick={() => {
+                  setFormData({...formData, role: 'CUSTOMER'});
+                  setLicenseFile(null);
+                  setLicenseError('');
+                  setErrors(prev => ({ ...prev, license: undefined }));
+                }}
               >
                 <FaUser /> Customer
               </button>
@@ -215,7 +329,12 @@ const SignUpPage = () => {
               <button
                 type="button"
                 className={`role-button ${formData.role === 'ADMIN' ? 'active' : ''}`}
-                onClick={() => setFormData({...formData, role: 'ADMIN'})}
+                onClick={() => {
+                  setFormData({...formData, role: 'ADMIN'});
+                  setLicenseFile(null);
+                  setLicenseError('');
+                  setErrors(prev => ({ ...prev, license: undefined }));
+                }}
               >
                 <FaUser /> Admin
               </button>

@@ -29,17 +29,22 @@ public class ReviewsManager {
     private final DateTimeFormatter ISO = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
     
+ // Replace existing method in UsersManager
     public String generateNextReviewsId() {
-        String maxId = reviewsRepository.findMaxReviewsId();
-        int nextNum = 1;
-        if (maxId != null && maxId.startsWith("R")) {
-            try {
-                nextNum = Integer.parseInt(maxId.substring(1)) + 1;
-            } catch (NumberFormatException e) {
-                nextNum = 1;
+        int max = 0;
+        // load all users (lightweight for modest user counts). If you prefer, add a repository query to return only ids.
+        for (Reviews u : reviewsRepository.findAll()) {
+            String id = u.getId();
+            if (id != null && id.startsWith("R")) {
+                try {
+                    int n = Integer.parseInt(id.substring(1));
+                    if (n > max) max = n;
+                } catch (NumberFormatException ignored) {
+                    // ignore non-numeric suffixes
+                }
             }
         }
-        return "R" + nextNum;
+        return "R" + (max + 1);
     }
     
     
