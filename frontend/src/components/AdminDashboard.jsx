@@ -1,20 +1,13 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {
-  FaHome,
-  FaUsers,
-  FaTools,
-  FaCalendarAlt,
-  FaStar,
-  FaExclamationTriangle,
-  FaPhoneAlt,
-  FaUserCircle,
-  FaEnvelope,
-  FaMapMarkerAlt,
-  FaSignOutAlt,
-  FaCheck,
+  FaHome,  FaUsers,  FaTools,  FaCalendarAlt,
+  FaStar,  FaExclamationTriangle,  FaPhoneAlt,  FaUserCircle,
+  FaEnvelope,  FaMapMarkerAlt,  FaSignOutAlt,  FaCheck,
+  FaTimes,  FaFacebookMessenger
 } from "react-icons/fa";
 import "./AdminDashboard.css";
 import Reviews from "./Reviews";
+import ChatPanel from "./ChatPanel";
 
 const userExamples = [
   { name: "Suresh Kumar", email: "suresh.k@example.com", role: "Customer" },
@@ -27,13 +20,6 @@ const userExamples = [
   { name: "Rita Menon", email: "rita.m@example.com", role: "Provider" },
   { name: "Manoj Kumar", email: "manoj.k@example.com", role: "Customer" },
   { name: "Sunita Rao", email: "sunita.r@example.com", role: "Provider" },
-];
-
-const bookings = [
-  { id: 2001, user: "Suresh Kumar", service: "Plumbing", status: "Completed" },
-  { id: 2002, user: "Priya Sharma", service: "Electrical", status: "In Progress" },
-  { id: 2003, user: "Arun Raj", service: "Carpentry", status: "Pending" },
-  { id: 2004, user: "Meena Reddy", service: "Appliance Repair", status: "Completed" },
 ];
 
 const complaints = [
@@ -70,12 +56,33 @@ const AdminDashboard = () => {
   const [users, setUsers] = useState(userExamples);
   const [providers, setProviders] = useState([]);
   const [customers, setCustomers] = useState([]);
+  const [bookings, setBookings] = useState([]);
+  const [reports, setReports] = useState([]);
+
+
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [selectedProvider, setSelectedProvider] = useState(null);
+  const [processingServiceId, setProcessingServiceId] = useState(null);
+
 
   const [reviews, setReviews] = useState([]);
   const [loadingReviews, setLoadingReviews] = useState(true);
   const [showReviewsCard, setShowReviewsCard] = useState(false); // show reviews column to the right
+
+
+  // Chat-related state for Admin
+  const [adminUser, setAdminUser] = useState(null); // { id, name, email }
+  const [conversations, setConversations] = useState([]); // { peerId, peerName, lastMessage, lastAt }
+  const [loadingConversations, setLoadingConversations] = useState(false);
+  const [selectedPeer, setSelectedPeer] = useState(null);
+  const [selectedPeerName, setSelectedPeerName] = useState('');
+
+
+  // document-related state
+  const [documentsCache, setDocumentsCache] = useState(null); // cached metadata from /users/documents
+  const [docModalUrl, setDocModalUrl] = useState(null); // blob URL when using modal fallback
+  const [docModalOpen, setDocModalOpen] = useState(false);
+  const [docLoading, setDocLoading] = useState(false);
 
   useEffect(() => {
     const fetchProviders = async () => {
@@ -93,6 +100,21 @@ const AdminDashboard = () => {
   }, []);
 
   useEffect(() => {
+    const fetchReports = async () => {
+      try {
+        const response = await fetch("http://localhost:8087/api/reports");
+        if (!response.ok) throw new Error("Failed to fetch reports");
+        const data = await response.json();
+        setReports(data);
+      } catch (error) {
+        console.error("Error fetching reports:", error);
+        setReports([]);
+      }
+    };
+    fetchReports();
+  }, []);
+
+  useEffect(() => {
     const fetchCustomers = async () => {
       try {
         const response = await fetch("http://localhost:8087/users/customers");
@@ -106,6 +128,24 @@ const AdminDashboard = () => {
     };
     fetchCustomers();
   }, []);
+
+
+  useEffect(() => {
+    const fetchBookings = async () => {
+      try {
+        const response = await fetch("http://localhost:8087/bookings/all");
+        if (!response.ok) throw new Error("Failed to fetch bookings");
+        const data = await response.json();
+        setBookings(data);
+      } catch (error) {
+        console.error("Error fetching bookings:", error);
+        setBookings([]);
+      }
+    };
+    fetchBookings();
+  }, []);
+
+
 
   useEffect(() => {
     const fetchReviews = async () => {
@@ -125,9 +165,167 @@ const AdminDashboard = () => {
     fetchReviews();
   }, []);
 
+
+  // Get admin profile and store admin id (so chat endpoints can use it)
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    fetch('http://localhost:8087/users/me', {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+    })
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to fetch admin profile: ' + res.status);
+        return res.json();
+      })
+      .then(data => {
+        setAdminUser({ id: data.id, name: data.name, email: data.email });
+        if (data.id) localStorage.setItem('userId', data.id);
+      })
+      .catch(err => {
+        console.error('Error fetching admin user:', err);
+      });
+  }, []);
+
+  // Load conversations for admin when Chat tab active
+  useEffect(() => {
+    const loadConversations = async () => {
+      const token = localStorage.getItem('token');
+      const userId = adminUser?.id || localStorage.getItem('userId');
+      if (!userId) return;
+      setLoadingConversations(true);
+      try {
+        const url = `http://localhost:8087/api/chat/conversations?userId=${encodeURIComponent(userId)}`;
+        const res = await fetch(url, {
+          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+        });
+        if (!res.ok) {
+          const text = await res.text().catch(() => '');
+          throw new Error(`Conversations fetch failed: ${res.status} ${text}`);
+        }
+        const arr = await res.json();
+        const convs = (arr || []).map(c => ({
+          peerId: c.peerId,
+          peerName: c.peerName || c.peer_name || c.peer || c.peerId,
+          lastMessage: c.lastMessage || c.last_message || '',
+          lastAt: c.lastAt || c.last_at || ''
+        }));
+        setConversations(convs);
+      } catch (err) {
+        console.error('Failed loading admin conversations', err);
+        setConversations([]);
+      } finally {
+        setLoadingConversations(false);
+      }
+    };
+
+    if (activeTab === 'chat') {
+      loadConversations();
+      // OPTIONAL: poll every 3s while on chat tab to get updates without sockets
+      const interval = setInterval(() => {
+        loadConversations().catch(() => {});
+      }, 3000);
+      return () => clearInterval(interval);
+    }
+  }, [activeTab, adminUser]);
+
+
+
   // Safe provider id getter (works with various shapes)
   const getProviderId = (p) =>
     p == null ? null : (p.id ?? p._id ?? p.providerId ?? p.provider?.id ?? null);
+
+
+  // Replace your existing updateProviderVerification with this function
+  // helper to resolve an id for a providers list item (service or nested provider)
+  const resolveServiceId = (item) => {
+    return (
+      item?.id ??
+      item?._id ??
+      item?.serviceId ??
+      item?.provider?.id ??
+      item?.providerId ??
+      null
+    );
+  };
+
+  const updateProviderVerification = async (serviceItem, newStatus) => {
+    const serviceId = resolveServiceId(serviceItem);
+    if (!serviceId) {
+      console.error("updateProviderVerification: missing id for item", serviceItem);
+      alert("Unable to update: missing id");
+      return;
+    }
+
+    const token = localStorage.getItem("token");
+    setProcessingServiceId(serviceId);
+
+    // Adjust URL to your backend route if different
+    const url = `http://localhost:8087/service/${serviceId}/verify`; // or /service/{id}/verify
+
+    try {
+      console.log("updateProviderVerification: sending", { url, serviceId, newStatus });
+
+      const res = await fetch(url, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ verified: newStatus }),
+      });
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        console.error("updateProviderVerification: server error", res.status, text);
+        alert(`Failed to update provider status: ${res.status} ${text}`);
+        return;
+      }
+
+      // parse response if JSON returned
+      let returned = null;
+      try {
+        returned = await res.json();
+      } catch (_) {
+        returned = null;
+      }
+
+      // Update providers state by id (merge returned fields with existing item to preserve nested data)
+      setProviders(prev => {
+        return prev.map(item => {
+          const itemId = resolveServiceId(item);
+          if (String(itemId) !== String(serviceId)) return item;
+
+          // If server returned an updated object, merge it with the old item (prefer server-provided values)
+          if (returned && typeof returned === "object") {
+            const merged = {
+              ...item,               // start with current item
+              ...returned,           // overwrite with server-returned top-level fields
+              provider: {
+                // nested provider: prefer returned.provider, else keep item.provider
+                ...(item.provider || {}),
+                ...(returned.provider || {}),
+              },
+            };
+            return merged;
+          }
+
+          // No returned body -> optimistic update: keep everything but update verified
+          return { ...item, verified: newStatus };
+        });
+      });
+
+      console.log("updateProviderVerification: success", serviceId, newStatus);
+      // Optionally re-fetch providers to be 100% in sync with server:
+      // await fetchProviders(); // implement fetchProviders() or call existing loader
+    } catch (err) {
+      console.error("Error updating provider verification:", err);
+      alert("Network error while updating provider verification. See console.");
+    } finally {
+      setProcessingServiceId(null);
+    }
+  };
 
   // Build reviews map for quick stats
   const reviewsMap = useMemo(() => {
@@ -173,7 +371,7 @@ const AdminDashboard = () => {
 
   const activeBookingsCount = useMemo(() => {
     if (!Array.isArray(bookings)) return 0;
-    return bookings.filter(b => ["in progress", "inprogress", "active", "pending"].includes(String(b.status || "").toLowerCase())).length;
+    return bookings.filter(b => ["in_progress", "confirmed", "pending"].includes(String(b.status || "").toLowerCase())).length;
   }, [bookings]);
 
   const statsData = useMemo(() => [
@@ -183,7 +381,7 @@ const AdminDashboard = () => {
     { value: pendingApprovalsCount, label: "Pending Approvals" },
   ], [customers, activeBookingsCount, verifiedProvidersCount, pendingApprovalsCount]);
 
-  // NEW: only approved providers for Services tab
+  // only approved providers for Services tab
   const approvedProviders = useMemo(() => {
     if (!Array.isArray(providers)) return [];
     return providers.filter(p => String(p.verified ?? "").toLowerCase() === "approved");
@@ -200,6 +398,110 @@ const AdminDashboard = () => {
   const handleDeleteProvider = (index) => {
     setProviders((prev) => prev.filter((_, i) => i !== index));
   };
+
+  // put with other imports/hooks near top of component
+  const providersSorted = React.useMemo(() => {
+    if (!Array.isArray(providers)) return [];
+
+    const rank = (p) => {
+      const v = String(p?.verified ?? "").toLowerCase();
+      if (v === "pending") return 0;    // highest priority -> show first
+      if (v === "approved") return 1;
+      if (v === "rejected") return 2;
+      return 3; // unknown / other last
+    };
+
+    // stable sort: include original index so equal-rank items keep original order
+    return providers
+      .map((p, idx) => ({ p, idx, r: rank(p) }))
+      .sort((a, b) => {
+        if (a.r !== b.r) return a.r - b.r;
+        // tie-breaker: provider name (safe fallback to empty string)
+        const nameA = String(a.p?.provider?.name ?? a.p?.name ?? "").toLowerCase();
+        const nameB = String(b.p?.provider?.name ?? b.p?.name ?? "").toLowerCase();
+        if (nameA < nameB) return -1;
+        if (nameA > nameB) return 1;
+        return a.idx - b.idx;
+      })
+      .map(x => x.p);
+  }, [providers]);
+
+  // --- Document logic --------------------------------------------------
+  // Fetch and cache documents metadata (lazy load)
+  const fetchDocumentsMetadata = async () => {
+    if (documentsCache) return documentsCache;
+    try {
+      const res = await fetch("http://localhost:8087/users/documents");
+      if (!res.ok) throw new Error("Failed to fetch documents");
+      const data = await res.json();
+      setDocumentsCache(data);
+      return data;
+    } catch (err) {
+      console.error("Error fetching documents metadata:", err);
+      return null;
+    }
+  };
+
+  // Try to open the document in a new tab using stream endpoint.
+  // If that fails (CORS or 404), fallback to fetching as blob and showing in modal.
+  const handleSeeDocument = async (provider) => {
+    const providerId = getProviderId(provider);
+    if (!providerId) {
+      alert("Provider id not available for this row");
+      return;
+    }
+
+    setDocLoading(true);
+    try {
+      const docs = await fetchDocumentsMetadata();
+      if (!docs) {
+        alert("No document metadata available");
+        setDocLoading(false);
+        return;
+      }
+      const match = docs.find(d => String(d.provider_id) === String(providerId));
+      if (!match) {
+        alert("No document found for this provider");
+        setDocLoading(false);
+        return;
+      }
+
+      const openUrl = `http://localhost:8087/users/document/${encodeURIComponent(match.document_id)}`;
+      // Preferred: open in new tab so browser displays PDF inline.
+      const newTab = window.open(openUrl, "_blank");
+      if (newTab) {
+        // successfully opened; leave it to browser to render
+        setDocLoading(false);
+        return;
+      }
+
+      // Fallback: fetch as blob and show inside modal (CORS must allow this)
+      try {
+        const r = await fetch(openUrl);
+        if (!r.ok) {
+          throw new Error(`Failed to fetch file: ${r.status}`);
+        }
+        const blob = await r.blob();
+        const url = URL.createObjectURL(blob);
+        setDocModalUrl(url);
+        setDocModalOpen(true);
+      } catch (err) {
+        console.error("Fallback fetch failed:", err);
+        alert("Failed to open document. Check server streaming endpoint or CORS.");
+      }
+    } finally {
+      setDocLoading(false);
+    }
+  };
+
+  const closeDocModal = () => {
+    setDocModalOpen(false);
+    if (docModalUrl) {
+      URL.revokeObjectURL(docModalUrl);
+      setDocModalUrl(null);
+    }
+  };
+  // ---------------------------------------------------------------------
 
   const CustomerCard = ({ customers }) => (
     <div className="modal-left">
@@ -232,7 +534,7 @@ const AdminDashboard = () => {
       <aside className="sidebar">
         <h2 className="logo">FixItNow</h2>
         <div className="sidebar-title">FixItNow</div>
-        <div className="sidebar-subtitle">ADMIN</div>
+        
         <ul>
           <li className={activeTab === "home" ? "active" : ""} onClick={() => setActiveTab("home")}>
             <FaHome /> Home
@@ -251,6 +553,9 @@ const AdminDashboard = () => {
           </li>
           <li className={activeTab === "complaints" ? "active" : ""} onClick={() => setActiveTab("complaints")}>
             <FaExclamationTriangle /> Complaints
+          </li>
+          <li className={activeTab === "chat" ? "active" : ""} onClick={() => setActiveTab("chat")}>
+            <FaFacebookMessenger /> Messages
           </li>
         </ul>
         <div className="sidebar-bottom">
@@ -310,8 +615,8 @@ const AdminDashboard = () => {
                     {bookings.map((b, i) => (
                       <tr key={i}>
                         <td>{b.id}</td>
-                        <td>{b.user}</td>
-                        <td>{b.service}</td>
+                        <td>{b.customer.name}</td>
+                        <td>{b.provider.name}</td>
                         <td>
                           <span className={`status ${b.status.replace(" ", "").toLowerCase()}`}>{b.status}</span>
                         </td>
@@ -324,15 +629,63 @@ const AdminDashboard = () => {
           </>
         )}
 
+
+        {/* Chat Page */}
+        {activeTab === 'chat' && (
+          <div className="chat-page">
+            <div className="chat-sidebar">
+              <h3>Conversations</h3>
+              {loadingConversations ? (
+                <div style={{ color: '#666' }}>Loading...</div>
+              ) : (
+                <div className="conversations-list">
+                  {conversations.length === 0 ? (
+                    <div style={{ color: '#999' }}>No conversations yet.</div>
+                  ) : (
+                    conversations.map(conv => (
+                      <button
+                        key={conv.peerId}
+                        onClick={() => { setSelectedPeer(conv.peerId); setSelectedPeerName(conv.peerName || conv.peerId); }}
+                        className={`conversation-btn ${selectedPeer === conv.peerId ? 'active' : ''}`}
+                        type="button"
+                      >
+                        <div className="conversation-peer">{conv.peerName || conv.peerId}</div>
+                        <div className="conversation-preview">{conv.lastMessage}</div>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="chat-main">
+              {selectedPeer ? (
+                <ChatPanel
+                  currentUserId={adminUser?.id || localStorage.getItem('userId')}
+                  peerId={selectedPeer}
+                  peerName={selectedPeerName}
+                  onBack={() => setSelectedPeer(null)}
+                />
+              ) : (
+                <div className="chat-empty">
+                  <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>No conversation selected</div>
+                  <div>Select a person from the left to view and reply to messages.</div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+
         {activeTab === "users" && (
           <div>
-            <div className="table-header">
+            <div className="table wide-table">
+              <div className="table-header">
               <h3><b>Customers</b></h3>
               <button className="manage-btn" onClick={() => setManageUsers((prev) => !prev)}>
                 {manageUsers ? "Done" : "Manage Users"}
               </button>
             </div>
-            <div className="table wide-table">
               <table>
                 <thead>
                   <tr>
@@ -406,13 +759,13 @@ const AdminDashboard = () => {
 
         {activeTab === "services" && (
           <div>
-            <div className="table-header">
-              <h3><b>Service Providers</b></h3>
-              <button className="manage-btn" onClick={() => setManageProviders((prev) => !prev)}>
-                {manageProviders ? "Done" : "Manage Providers"}
-              </button>
-            </div>
             <div className="table wide-table">
+              <div className="table-header">
+                <h3><b>Service Providers</b></h3>
+                <button className="manage-btn" onClick={() => setManageProviders((prev) => !prev)}>
+                  {manageProviders ? "Done" : "Manage Providers"}
+                </button>
+              </div>
               <table>
                 <thead>
                   <tr>
@@ -512,13 +865,13 @@ const AdminDashboard = () => {
 
         {activeTab === "verification" && (
           <div>
-            <div className="table-header">
-              <h3><b>Verification of Providers</b></h3>
-              <button className="manage-btn" onClick={() => setManageProviders((prev) => !prev)}>
-                {manageProviders ? "Done" : "Manage Providers"}
-              </button>
-            </div>
             <div className="table wide-table">
+              <div className="table-header">
+                <h3><b>Verification of Providers</b></h3>
+                <button className="manage-btn" onClick={() => setManageProviders((prev) => !prev)}>
+                  {manageProviders ? "Done" : "Manage Providers"}
+                </button>
+              </div>
               <table>
                 <thead>
                   <tr>
@@ -526,27 +879,51 @@ const AdminDashboard = () => {
                     <th>Provider Name</th>
                     <th></th>
                     <th>Status</th>
-                    <th>Created On</th>
-                    {manageProviders && <th>Actions</th>}
+                    <th>Uploaded On</th>
+                    {manageProviders && <th>Verify</th>}
                   </tr>
                 </thead>
                 <tbody>
-                  {providers.map((p, i) => (
-                    <tr key={i}>
+                  {providersSorted.map((p, i) => (
+                    <tr key={p.id ?? p._id ?? i}>
                       <td>{p.id}</td>
                       <td>{p.provider?.name}</td>
                       <td>
-                        <button className="admin-connect-button" onClick={() => setSelectedProvider(p.provider ?? p)}>
-                          See Document
+                        <button
+                          className="admin-connect-button"
+                          onClick={() => handleSeeDocument(p.provider ?? p)}
+                          disabled={docLoading}
+                        >
+                          {docLoading ? "Loading..." : "See Document"}
                         </button>
                       </td>
                       <td>
-                        <span className={`status ${p.verified?.toLowerCase()}`}>{p.verified}</span>
+                        <span className={`status ${String(p.verified ?? "").toLowerCase()}`}>{p.verified}</span>
                       </td>
                       <td>{p.provider?.createdOn}</td>
                       {manageProviders && (
                         <td>
-                          <button className="delete-btn" onClick={() => handleDeleteProvider(i)}>Delete</button>
+                          {String(p.verified ?? "").toLowerCase() === "pending" ? (
+                            <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                              <button
+                                className="approve-btn"
+                                onClick={() => updateProviderVerification(p, "APPROVED")}
+                                disabled={processingServiceId === (p.id ?? p._id ?? p.provider?.id)}
+                                title="Approve provider"
+                              >
+                                <FaCheck />
+                              </button>
+
+                              <button
+                                className="reject-btn"
+                                onClick={() => updateProviderVerification(p, "REJECTED")}
+                                disabled={processingServiceId === (p.id ?? p._id ?? p.provider?.id)}
+                                title="Reject provider"
+                              >
+                                <FaTimes />
+                              </button>
+                            </div>
+                          ) : 'NA'}
                         </td>
                       )}
                     </tr>
@@ -559,12 +936,13 @@ const AdminDashboard = () => {
 
         {activeTab === "bookings" && (
           <div className="table wide-table">
-            <h3>Recent Bookings</h3>
+            <h3>Bookings</h3>
             <table>
               <thead>
                 <tr>
                   <th>ID</th>
-                  <th>User</th>
+                  <th>Customer</th>
+                  <th>Provider</th>
                   <th>Service</th>
                   <th>Status</th>
                 </tr>
@@ -573,8 +951,9 @@ const AdminDashboard = () => {
                 {bookings.map((b, i) => (
                   <tr key={i}>
                     <td>{b.id}</td>
-                    <td>{b.user}</td>
-                    <td>{b.service}</td>
+                    <td>{b.customer.name}</td>
+                    <td>{b.provider.name}</td>
+                    <td>{b.service.category}</td>
                     <td>
                       <span className={`status ${b.status.replace(" ", "").toLowerCase()}`}>{b.status}</span>
                     </td>
@@ -586,21 +965,42 @@ const AdminDashboard = () => {
         )}
 
         {activeTab === "complaints" && (
-          <div>
-            <h3 style={{ marginBottom: "1.2rem" }}>User Complaints</h3>
-            <div className="complaints-list">
-              {complaints.map((comp, idx) => (
-                <div className="complaint-card" key={idx}>
-                  <div className="complaint-header">
-                    <strong>
-                      {comp.user} &rarr; {comp.provider}
-                    </strong>
-                    <span className="complaint-date">{comp.date}</span>
-                  </div>
-                  <div className="complaint-body">{comp.complaint}</div>
-                </div>
-              ))}
-            </div>
+          <div className="table wide-table">
+            <div className="table-header">
+                <h3><b>Reports</b></h3>
+                <button className="manage-btn" onClick={() => setManageProviders((prev) => !prev)}>
+                  {manageProviders ? "Done" : "Manage Providers"}
+                </button>
+              </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Customer</th>
+                  <th>Provider</th>
+                  <th>Report</th>
+                  <th>Created On</th>
+                  {manageProviders && <th>Actions</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {reports.map((r, i) => (
+                  <tr key={i}>
+                    <td>{r.id}</td>
+                    <td>{r.reportedBy.name}</td>
+                    <td>{r.reportedOn.name}</td>
+                    <td>{r.reason}</td>
+                    <td>{r.createdAt}</td>
+                    
+                    {manageProviders && (
+                        <td>
+                          <button className="delete-btn" onClick={() => handleDeleteProvider(i)}>Delete</button>
+                      </td>
+                      )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
 
@@ -610,6 +1010,22 @@ const AdminDashboard = () => {
           </div>
         )}
       </main>
+
+      {/* Document modal fallback */}
+      {docModalOpen && (
+        <div className="a-modal-overlay" onClick={closeDocModal}>
+          <div className="a-modal-content" onClick={e => e.stopPropagation()}>
+            <button className="a-modal-close-btn" onClick={closeDocModal}>×</button>
+            <div style={{ width: '80vw', height: '80vh' }}>
+              <iframe
+                src={docModalUrl}
+                title="Provider Document"
+                style={{ width: '100%', height: '100%', border: 'none' }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

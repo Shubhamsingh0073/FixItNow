@@ -3,7 +3,7 @@
   /* width: 100%; */
   /* max-width: 920px; */
   /* margin: 20px auto; */
-  height: 680px;
+  height: 100%;
   background: linear-gradient(180deg, #f6f9ff 0%, #ffffff 100%);
   z-index: 1112;
   border-radius: 14px;
@@ -61,3 +61,105 @@
 .chat-send:disabled { opacity: 0.6; transform: none; box-shadow: none; cursor: default; }
 
 .timestamp { font-size: 11px; color: #9aa4b2; }
+
+
+/* chat page css */
+/* Container for chat area inside dashboard */
+.chat-page {
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+}
+
+/* Left conversations sidebar */
+.chat-sidebar {
+  width: 320px;
+  min-height: 400px;
+  background: #fff;
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.06);
+  overflow-y: auto;
+}
+
+/* Title inside sidebar */
+.chat-sidebar h3 {
+  margin-top: 0;
+  margin-bottom: 12px;
+  font-size: 1.1rem;
+}
+
+/* Conversations list */
+.conversations-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Individual conversation button */
+.conversation-btn {
+  text-align: left;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #eee;
+  background: #fff;
+  cursor: pointer;
+  display: block;
+  width: 100%;
+  color: inherit;
+  line-height: 1.1;
+}
+
+/* Active conversation style */
+.conversation-btn.active {
+  border: 2px solid #6156f8;
+  background: #f7f5ff;
+}
+
+/* Peer name within the conversation item */
+.conversation-peer {
+  font-weight: 600;
+}
+
+/* Last message preview */
+.conversation-preview {
+  font-size: 12px;
+  color: #666;
+  margin-top: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Main chat panel container (right side) */
+.chat-main {
+  flex: 1;
+  height: 565px;
+  background: #fff;
+  border-radius: 8px;
+  padding: 10px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Fallback when no conversation selected */
+.chat-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  color: #666;
+}
+
+/* Small responsive tweak */
+@media (max-width: 720px) {
+  .chat-sidebar {
+    width: 260px;
+  }
+
+  .chat-page {
+    gap: 12px;
+  }
+}

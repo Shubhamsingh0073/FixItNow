@@ -7,6 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import FixItNow.model.Services;
+import FixItNow.model.ServicesVerified;
 import FixItNow.model.Users;
 import FixItNow.repository.ServicesRepository;
 
@@ -14,6 +15,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 public class ServicesManager {
@@ -50,6 +52,17 @@ public class ServicesManager {
         service.setDescription("Default description for new provider");
         service.setAvailability("{\"Monday\": \"9-5\"}");
         return sr.save(service);
+    }
+    
+    
+    @Transactional
+    public boolean updateVerified(String id, ServicesVerified status) {
+        Optional<Services> opt = sr.findById(id);
+        if (opt.isEmpty()) return false;
+        Services s = opt.get();
+        s.setVerified(status);
+        sr.save(s);
+        return true;
     }
 
     /*Update service details for the provider. */

@@ -3,6 +3,7 @@ package FixItNow.controller;
 import FixItNow.manager.ServicesManager;
 import FixItNow.manager.UsersManager;
 import FixItNow.model.Services;
+import FixItNow.model.ServicesVerified;
 import FixItNow.model.Users;
 import FixItNow.model.UserRole;
 import FixItNow.repository.ServicesRepository;
@@ -19,6 +20,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @CrossOrigin(origins = "*")
 
@@ -41,9 +43,8 @@ public class ServicesController {
     public List<Services> getAllServices() {
         return servicesRepository.findAll();
     }
+     
     
-    
-
     // Get services for a specific provider
     @GetMapping("/provider/{providerId}")
     public List<Services> getServicesByProvider(@PathVariable String providerId) {
@@ -123,6 +124,45 @@ public class ServicesController {
         
         
         return ResponseEntity.ok(response);
+    }
+    
+    
+    @PutMapping("/{id}/verify")
+    public ResponseEntity<?> updateServiceVerified(
+            @PathVariable("id") String id,
+            @RequestBody Map<String, Object> body) {
+
+        // Expect payload like: { "verified": true } or { "verified": "VERIFIED" }
+        Object verifiedObj = body.get("verified");
+        if (verifiedObj == null) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Missing 'verified' in body"));
+        }
+
+        // load entity (id is String)
+        Optional<Services> opt = servicesRepository.findById(id);
+        if (opt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        Services service = opt.get();
+
+        // convert payload into ServicesVerified
+        ServicesVerified newStatus;
+        if (verifiedObj instanceof Boolean) {
+            boolean b = (Boolean) verifiedObj;
+            newStatus = b ? ServicesVerified.APPROVED : ServicesVerified.REJECTED;
+        } else {
+            // allow passing enum name directly like "VERIFIED" or "PENDING"
+            try {
+                newStatus = ServicesVerified.valueOf(String.valueOf(verifiedObj).toUpperCase());
+            } catch (IllegalArgumentException ex) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Invalid verified value"));
+            }
+        }
+
+        service.setVerified(newStatus);
+        servicesRepository.save(service);
+
+        return ResponseEntity.ok(Map.of("id", id, "verified", newStatus.name()));
     }
     
     

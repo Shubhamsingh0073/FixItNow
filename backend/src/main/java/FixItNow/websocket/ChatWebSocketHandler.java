@@ -1,162 +1,125 @@
 package FixItNow.websocket;
 
-import java.io.IOException;
-import java.net.URI;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import org.springframework.stereotype.Component;
-import org.springframework.web.socket.CloseStatus;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.socket.TextMessage;
-import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
+import org.springframework.web.socket.WebSocketSession;
+import org.springframework.web.util.UriUtils;
+import org.springframework.web.socket.CloseStatus;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-
+import FixItNow.manager.MessageManager;
+import FixItNow.manager.UsersManager;
 import FixItNow.model.Message;
-import FixItNow.model.Users;
-import FixItNow.repository.MessageRepository;
-import FixItNow.repository.UsersRepository;
+
+import java.util.Map;
 
 /**
- * Simple Text WebSocket handler that maps a connected userId to a session and
- * forwards JSON messages between users.
+ * JWT-authenticated WebSocket handler.
+ * The JwtHandshakeInterceptor authenticates the token and sets "userId" in session attributes.
+ * Client must pass token during connection (query param ?token=... or Authorization header).
  *
- * Connect clients using: ws://<host>:<port>/ws/chat?userId=<yourUserId>
- * Sent messages are expected to be JSON objects like: { "to": "peerId", "content": "hello" }
+ * Incoming payload expected JSON: { "to": "<userId>", "content": "..." }
+ * The server will determine the sender as the authenticated user in the session attributes.
  */
 @Component
 public class ChatWebSocketHandler extends TextWebSocketHandler {
 
-	private final ObjectMapper objectMapper = new ObjectMapper();
+    @Autowired
+    private WebSocketSessionRegistry registry;
 
-	// userId -> session
-	private final Map<String, WebSocketSession> sessions = new ConcurrentHashMap<>();
+    @Autowired
+    private MessageManager messageManager;
 
-	private final MessageRepository messageRepository;
-	private final UsersRepository usersRepository;
+    @Autowired
+    private UsersManager usersManager;
 
-	public ChatWebSocketHandler(MessageRepository messageRepository, UsersRepository usersRepository) {
-		this.messageRepository = messageRepository;
-		this.usersRepository = usersRepository;
-	}
+    private final ObjectMapper mapper = new ObjectMapper();
 
-	@Override
-	public void afterConnectionEstablished(WebSocketSession session) throws Exception {
-		URI uri = session.getUri();
-		if (uri == null) return;
-		String query = uri.getQuery();
-		String userId = parseQueryParam(query, "userId");
-		if (userId != null && !userId.isBlank()) {
-			sessions.put(userId, session);
-			// notify connected
-			var payload = Map.of("system", true, "message", "connected", "userId", userId);
-			session.sendMessage(new TextMessage(objectMapper.writeValueAsString(payload)));
-		} else {
-			// close connection if no userId provided
-			session.close(CloseStatus.BAD_DATA);
-		}
-	}
+    @Override
+    public void afterConnectionEstablished(WebSocketSession session) throws Exception {
+        // userId was injected into attributes by JwtHandshakeInterceptor
+        Object uid = session.getAttributes().get("userId");
+        if (uid == null) {
+            // no authenticated user - close
+            session.close(CloseStatus.BAD_DATA);
+            return;
+        }
+        String userId = String.valueOf(uid);
+        registry.register(userId, session);
+        System.out.println("[ChatWS] connection established: userId=" + userId + " sessionId=" + session.getId());
 
-	@Override
-	protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
-		String payload = message.getPayload();
-		Map<String, Object> data = objectMapper.readValue(payload, Map.class);
 
-		// Expected fields: to, content, (optional) from
-		String to = (String) data.get("to");
-		String content = (String) data.get("content");
-		String from = (String) data.get("from");
+        // send a system message acknowledging connection
+        ObjectNode sys = mapper.createObjectNode();
+        sys.put("system", true);
+        sys.put("message", "connected");
+        session.sendMessage(new TextMessage(mapper.writeValueAsString(sys)));
+    }
 
-		if (to == null || content == null || from == null) {
-			// ignore or send error back
-			var err = Map.of("error", "missing 'to' or 'from' or 'content' field");
-			session.sendMessage(new TextMessage(objectMapper.writeValueAsString(err)));
-			return;
-		}
+    @Override
+    protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
+    	System.out.println("[ChatWS] onMessage payload=" + message.getPayload() + " sessionUser=" + session.getAttributes().get("userId"));
 
-		// Persist message to database
-		try {
-			Users sender = usersRepository.findById(from).orElse(null);
-			Users receiverUser = usersRepository.findById(to).orElse(null);
+    	Map<String, Object> json;
+        try {
+            json = mapper.readValue(message.getPayload(), Map.class);
+        } catch (Exception e) {
+            // invalid JSON - ignore
+            return;
+        }
 
-			Message saved = null;
-			if (sender != null && receiverUser != null) {
-				Message msg = new Message();
-				msg.setId(UUID.randomUUID().toString());
-				msg.setSender(sender);
-				msg.setReceiver(receiverUser);
-				msg.setContent(content);
-				saved = messageRepository.save(msg);
-			}
+        // determine authenticated sender
+        String senderId = (String) session.getAttributes().get("userId");
+        if (senderId == null) return;
 
-			String timestamp = saved != null && saved.getSentAt() != null ? saved.getSentAt().toString() : null;
+        // Expect "to" and "content"
+        String to = (String) json.get("to");
+        String content = (String) json.get("content");
+        
+        String tempId = json.get("tempId") != null ? (String) json.get("tempId") : null;
 
-			// Echo to sender with timestamp
-			var sentBack = Map.of("from", from, "content", content, "to", to, "sentAt", timestamp);
-			session.sendMessage(new TextMessage(objectMapper.writeValueAsString(sentBack)));
+        if (to == null || content == null || content.trim().isEmpty()) {
+            // ignore invalid payload
+            return;
+        }
 
-			WebSocketSession receiver = sessions.get(to);
-			if (receiver != null && receiver.isOpen()) {
-				var forward = Map.of("from", from, "content", content, "to", to, "sentAt", timestamp);
-				receiver.sendMessage(new TextMessage(objectMapper.writeValueAsString(forward)));
-			} else {
-				// send system notice back (receiver offline)
-				var sys = Map.of("system", true, "message", "user-offline", "to", to);
-				session.sendMessage(new TextMessage(objectMapper.writeValueAsString(sys)));
-			}
-		} catch (IOException ioe) {
-			var err = Map.of("error", "server-error");
-			session.sendMessage(new TextMessage(objectMapper.writeValueAsString(err)));
-		}
-	}
+        // Persist message using MessageManager (resolves Users)
+        Message saved = messageManager.saveMessage(senderId, to, content);
 
-	@Override
-	public void afterConnectionClosed(WebSocketSession session, CloseStatus status) throws Exception {
-		// remove session from map if present
-		sessions.values().removeIf(s -> s.getId().equals(session.getId()));
-	}
+        // Build outgoing JSON
+        ObjectNode out = mapper.createObjectNode();
+        out.put("id", saved.getId());
+        out.put("from", saved.getSender() != null ? saved.getSender().getId() : senderId);
+        out.put("to", saved.getReceiver() != null ? saved.getReceiver().getId() : to);
+        out.put("content", saved.getContent());
+        out.put("sentAt", saved.getSentAt() != null ? saved.getSentAt().toString() : null);
+        
+        if (tempId != null) { out.put("tempId", tempId); }
 
-	private String parseQueryParam(String query, String key) {
-		if (query == null) return null;
-		String[] parts = query.split("&");
-		for (String p : parts) {
-			String[] kv = p.split("=", 2);
-			if (kv.length == 2 && kv[0].equals(key)) return kv[1];
-		}
-		return null;
-	}
+        String outText = mapper.writeValueAsString(out);
+
+        // Send to recipient if online
+        WebSocketSession recipientSession = registry.getSession(to);
+        if (recipientSession != null && recipientSession.isOpen()) {
+            recipientSession.sendMessage(new TextMessage(outText));
+        }
+
+        // Also send back to sender (so optimistic pending message gets replaced)
+        WebSocketSession senderSession = registry.getSession(senderId);
+        if (senderSession != null && senderSession.isOpen()) {
+            senderSession.sendMessage(new TextMessage(outText));
+        }
+    }
+
+    @Override
+    public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
+        try {
+            String removedUser = registry.removeBySession(session);
+            // no-op otherwise
+        } catch (Exception ignored) {}
+    }
 }
-
-////inside ChatWebSocketHandler.java (update your afterConnectionEstablished / onOpen)
-//@Override
-//public void afterConnectionEstablished(WebSocketSession session) throws Exception {
-// URI uri = session.getUri();
-// String query = (uri == null) ? null : uri.getQuery();
-//
-// // Try several keys in order of preference
-// String userId = parseQueryParam(query, "userId");
-// if (userId == null || userId.isBlank()) {
-//     userId = parseQueryParam(query, "customerId");
-// }
-// if (userId == null || userId.isBlank()) {
-//     userId = parseQueryParam(query, "providerId");
-// }
-// if (userId == null || userId.isBlank()) {
-//     // No userId -> send an error and close the connection
-//     var err = Map.of("error", "missing userId (query param 'userId' or 'customerId' or 'providerId')");
-//     session.sendMessage(new TextMessage(objectMapper.writeValueAsString(err)));
-//     session.close(CloseStatus.BAD_DATA);
-//     return;
-// }
-//
-// // store session
-// sessions.put(userId, session);
-//
-// // Log for debugging
-// System.out.println("WebSocket connected: userId=" + userId + " sessionId=" + session.getId());
-// // Notify client if you want
-// var payload = Map.of("system", true, "message", "connected", "userId", userId);
-// session.sendMessage(new TextMessage(objectMapper.writeValueAsString(payload)));
-//}

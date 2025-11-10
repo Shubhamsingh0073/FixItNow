@@ -240,16 +240,74 @@
 }
 
 .status.rejected {
-    background: #fa3737;
+    background: #ffbdbd;
+    color: #e20606;
+    font-weight: 800;
 }
 
 .status.pending {
-    background: #faa91e;
+    background: #ffefd4;
+    color: #ffa200;
+    font-weight: 800;
 }
 
 .status.approved {
-    background: #24a560;
+    background: #d0fde5;
+    color: #18a55a;
+    font-weight: 800;
 }
+
+.status.completed {
+    background: #d0fde5;
+    color: #18a55a;
+    font-weight: 800;
+}
+
+.status.in_progress {
+    background: #d3ddfd;
+    color: #20139b;
+    font-weight: 800;
+}
+
+.status.cancelled {
+    background: #ffbdbd;
+    color: #e20606;
+    font-weight: 800;
+}
+
+.status.confirmed {
+    background: #d3ddfd;
+    color: #20139b;
+    font-weight: 800;
+}
+
+
+
+.approve-btn {
+    background: #2dbe58;
+    color: #fff;
+    border: none;
+    padding: 6px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.reject-btn {
+    background: #e53e3e;
+    color: #fff;
+    border: none;
+    padding: 6px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.approve-btn[disabled],
+.reject-btn[disabled] {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+
 
 
 /* Complaints */

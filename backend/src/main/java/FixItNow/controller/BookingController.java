@@ -2,11 +2,15 @@ package FixItNow.controller;
 
 import FixItNow.manager.*;
 import FixItNow.model.*;
+import FixItNow.repository.BookingRepository;
+
+import org.hibernate.query.Page;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.awt.print.Pageable;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -22,6 +26,18 @@ public class BookingController {
     
     @Autowired
     private UsersManager usersManager;
+    
+    @Autowired
+    private BookingRepository bookingRepository;
+
+       
+    
+    @GetMapping("/all")
+    public ResponseEntity<List<Booking>> getAllBookings() {
+        List<Booking> bookings = bookingRepository.findAll();
+        return ResponseEntity.ok(bookings);
+    }
+    
 
     @PostMapping("/create")
     public ResponseEntity<?> createBooking(

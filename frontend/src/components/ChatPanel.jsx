@@ -5,87 +5,175 @@ import "./ChatPanel.css";
 const WS_BASE = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.hostname}:8087/ws/chat`;
 
 /**
+ * Returns a stable string id for many possible shapes:
+ * - string or number -> string
+ * - object { id, _id, userId, user_id } -> the first available id as string
+ * - null/undefined -> ''
+ */
+function normalizeId(raw) {
+  if (raw == null) return "";
+  if (typeof raw === "string") return raw;
+  if (typeof raw === "number") return String(raw);
+  if (typeof raw === "object") {
+    const candidate = raw.id ?? raw._id ?? raw.userId ?? raw.user_id ?? raw.userid ?? raw.uid;
+    if (candidate != null) return String(candidate);
+    try {
+      return JSON.stringify(raw);
+    } catch {
+      return String(raw);
+    }
+  }
+  return String(raw);
+}
+
+/**
  * ChatPanel
  * props:
  *  - currentUserId: string (your user id)
  *  - peerId: string (the id of the other user you are chatting with)
  *  - peerName: string (optional display name)
  *  - onBack: function to navigate back
+ *
+ * NOTE: this component expects a JWT saved in localStorage under key "token".
+ * The client connects to: ws://.../ws/chat?token=<JWT>
  */
 const ChatPanel = ({ currentUserId, peerId, peerName = "Peer", onBack }) => {
   const [connected, setConnected] = useState(false);
-  const [messages, setMessages] = useState([]); // { from, content, system? }
+  const [messages, setMessages] = useState([]); // { id, from, to, content, sentAt, pending? }
   const [input, setInput] = useState("");
   const [status, setStatus] = useState("");
   const wsRef = useRef(null);
   const messagesEndRef = useRef(null);
 
+  // canonical current user id (string), fallback to localStorage
+  const myId = normalizeId(currentUserId ?? localStorage.getItem("userId"));
+
+  // helper to map server/history message object to our shape with normalized ids
+  const mapServerMessage = (m) => {
+    const id = m.id ?? m.messageId ?? m.message_id ?? "";
+    return {
+      id: id,
+      from: normalizeId(m.from),
+      to: normalizeId(m.to),
+      content: m.content,
+      sentAt: m.sentAt || m.createdAt || m.timestamp || m.time || null,
+    };
+  };
+
+  const handleIncomingWsMessage = (raw) => {
+    try {
+      const data = JSON.parse(raw);
+      if (data.system) {
+        setStatus(String(data.message || ""));
+        return;
+      }
+
+      const incoming = mapServerMessage(data);
+
+      setMessages(prev => {
+        // 1) If the server echoed tempId, match the optimistic by tempId
+        if (data.tempId) {
+          const idx = prev.findIndex(m => m.id === data.tempId && m.pending);
+          if (idx !== -1) {
+            const next = [...prev];
+            next[idx] = { id: incoming.id, from: incoming.from, to: incoming.to, content: incoming.content, sentAt: incoming.sentAt };
+            return next;
+          }
+        }
+
+        // 2) fallback: match by pending + content + from
+        const pendingIndex = prev.findIndex(m => m.pending && m.content === incoming.content && normalizeId(m.from) === incoming.from);
+        if (pendingIndex !== -1) {
+          const next = [...prev];
+          next[pendingIndex] = { id: incoming.id, from: incoming.from, to: incoming.to, content: incoming.content, sentAt: incoming.sentAt };
+          return next;
+        }
+
+        // 3) otherwise append new message, avoid duplicates by id
+        if (incoming.id) {
+          const exists = prev.some(m => (m.id && incoming.id && String(m.id) === String(incoming.id)));
+          if (exists) return prev;
+        }
+        return [...prev, { id: incoming.id || `msg-${Date.now()}-${Math.random().toString(36).slice(2,6)}`, from: incoming.from, to: incoming.to, content: incoming.content, sentAt: incoming.sentAt }];
+      });
+
+    } catch (err) {
+      console.error("[ChatPanel] invalid WS message", err, raw);
+    }
+  };
+
+
+  // Connection useEffect
   useEffect(() => {
-    if (!currentUserId) return;
-    const url = `${WS_BASE}?userId=${encodeURIComponent(currentUserId)}`;
+    const token = localStorage.getItem("token");
+    if (!token) {
+      console.warn("[ChatPanel] no token found - won't connect");
+      return;
+    }
+
+    const url = `${WS_BASE}?token=${encodeURIComponent(token)}`;
+    console.log("[ChatPanel] connecting to", url);
     const ws = new window.WebSocket(url);
     wsRef.current = ws;
 
     ws.onopen = () => {
-      console.log('WebSocket connected successfully');
+      console.log("[ChatPanel] ws.onopen");
       setConnected(true);
       setStatus("Connected");
     };
 
     ws.onmessage = (ev) => {
-      try {
-        const data = JSON.parse(ev.data);
-        // system messages
-        if (data.system) {
-          setStatus(String(data.message || ""));
-          return;
-        }
-
-        // expected: { id?, from, content, to, sentAt }
-        setMessages((prev) => {
-          // replace optimistic pending message if present
-          const pendingIndex = prev.findIndex(m => m.pending && m.from === data.from && m.content === data.content);
-          if (pendingIndex !== -1) {
-            const next = [...prev];
-            next[pendingIndex] = { id: data.id || next[pendingIndex].id, from: data.from, content: data.content, sentAt: data.sentAt };
-            return next;
-          }
-          return [...prev, { id: data.id, from: data.from, content: data.content, sentAt: data.sentAt }];
-        });
-      } catch (err) {
-        console.error("Invalid message", err);
-      }
+      handleIncomingWsMessage(ev.data);
     };
 
-    ws.onclose = () => {
+    ws.onerror = (ev) => {
+      console.log("[ChatPanel] ws.onerror", ev);
+      setStatus("Error");
+    };
+
+    ws.onclose = (ev) => {
+      console.log("[ChatPanel] ws.onclose", ev);
       setConnected(false);
       setStatus("Disconnected");
     };
 
-    ws.onerror = () => setStatus("Error");
-
     return () => {
-      if (ws && ws.readyState === WebSocket.OPEN) ws.close();
+      try {
+        if (ws && ws.readyState === WebSocket.OPEN) ws.close();
+      } catch (_) {}
     };
-  }, [currentUserId]);
+  }, []); // run once on mount
 
   // fetch message history
   useEffect(() => {
-    if (!currentUserId || !peerId) return;
-    const histUrl = `/api/chat/history?userA=${encodeURIComponent(currentUserId)}&userB=${encodeURIComponent(peerId)}`;
-    fetch(histUrl)
-      .then((res) => res.json())
+    const token = localStorage.getItem("token");
+    const uid = myId;
+    if (!uid || !peerId) {
+      console.log("[ChatPanel] skipping history fetch - missing uid or peerId", { uid, peerId });
+      return;
+    }
+
+    const histUrl = `http://localhost:8087/api/chat/history?userA=${encodeURIComponent(uid)}&userB=${encodeURIComponent(peerId)}`;
+    console.log("[ChatPanel] fetching history", histUrl);
+    fetch(histUrl, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error(`History fetch failed ${res.status}`);
+        return res.json();
+      })
       .then((arr) => {
-        const mapped = (arr || []).map((m) => ({
-          id: m.id,
-          from: m.sender ? m.sender.id : (m.from || ''),
-          content: m.content,
-          sentAt: m.sentAt
-        }));
+        const mapped = (arr || []).map((m) => {
+          const mm = mapServerMessage(m);
+          return { id: mm.id || `${Math.random().toString(36).slice(2)}`, from: mm.from, to: mm.to, content: mm.content, sentAt: mm.sentAt };
+        });
+        console.log("[ChatPanel] history loaded, messages:", mapped.length);
         setMessages(mapped);
       })
-      .catch((err) => console.error('Failed to load history', err));
-  }, [currentUserId, peerId]);
+      .catch((err) => {
+        console.error("Failed to load history", err);
+      });
+  }, [peerId, myId]);
 
   // scroll to bottom
   useEffect(() => {
@@ -94,15 +182,28 @@ const ChatPanel = ({ currentUserId, peerId, peerName = "Peer", onBack }) => {
 
   const sendMessage = () => {
     if (!input.trim()) return;
-    const payload = { to: peerId, content: input, from: currentUserId };
-    const tempId = `temp-${Date.now()}`;
-    const optimistic = { id: tempId, from: currentUserId, content: input, sentAt: new Date().toISOString(), pending: true };
-    setMessages((prev) => [...prev, optimistic]);
+
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const payload = { to: peerId, content: input, tempId };
+
+    const optimistic = {
+      id: tempId,
+      from: myId,
+      to: normalizeId(peerId),
+      content: input,
+      sentAt: new Date().toISOString(),
+      pending: true
+    };
+
+    setMessages(prev => [...prev, optimistic]);
     setInput("");
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify(payload));
+
+    const ws = wsRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(payload));
     } else {
       setStatus("Not connected");
+      console.warn("[ChatPanel] ws not ready; message queued locally");
     }
   };
 
@@ -116,7 +217,9 @@ const ChatPanel = ({ currentUserId, peerId, peerName = "Peer", onBack }) => {
   return (
     <div className="chat-panel">
       <div className="chat-header">
-        <button className="chat-back" onClick={onBack}>←</button>
+        <button className="chat-back" onClick={onBack}>
+          ←
+        </button>
         <div>
           <div className="chat-title">{peerName}</div>
           <div className="chat-sub">{status}</div>
@@ -124,20 +227,26 @@ const ChatPanel = ({ currentUserId, peerId, peerName = "Peer", onBack }) => {
       </div>
 
       <div className="chat-messages">
-        {messages.filter(m => m).map((m, i) => {
-          const mine = String(m.from) === String(currentUserId) || m.from === "me";
-          return (
-            <div key={m.id || i} className="message-row">
-              <div className={`message-bubble ${mine ? 'mine' : 'other'}`}>
-                {!mine && <div className="message-sender">{m.from}</div>}
-                <div className="message-content">{m.content}</div>
-                <div className="message-meta">
-                  <div className="timestamp">{m.sentAt ? new Date(m.sentAt).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : ''}</div>
+        {messages
+          .filter((m) => m)
+          .map((m, i) => {
+            const fromId = normalizeId(m.from);
+            const mine = fromId && fromId === myId;
+            return (
+              <div key={m.id || i} className={`message-row ${mine ? "mine" : "other"}`}>
+                <div className={`message-bubble ${mine ? "mine" : "other"}`}>
+                  {!mine && <div className="message-sender">{m.from}</div>}
+                  <div className="message-content">{m.content}</div>
+                  <div className="message-meta">
+                    <div className="timestamp">
+                      {m.sentAt ? new Date(m.sentAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}
+                    </div>
+                    {m.pending && <div style={{ fontSize: 11, color: "#888", marginLeft: 8 }}>Sending…</div>}
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
         <div ref={messagesEndRef} />
       </div>
 
@@ -150,26 +259,12 @@ const ChatPanel = ({ currentUserId, peerId, peerName = "Peer", onBack }) => {
           onKeyDown={onKeyDown}
           placeholder={connected ? "Type a message..." : "Connecting..."}
         />
-        <button className="chat-send" onClick={sendMessage} disabled={!input.trim()}>Send</button>
+        <button className="chat-send" onClick={sendMessage} disabled={!input.trim()}>
+          Send
+        </button>
       </div>
     </div>
   );
-};
-
-const styles = {
-  container: { width: "100%", maxWidth: 700, border: "1px solid #e6e6e6", borderRadius: 8, display: "flex", flexDirection: "column", height: 520, background: "#f7f7f7" },
-  header: { padding: 12, borderBottom: "1px solid #eee", display: "flex", gap: 12, alignItems: "center" },
-  backBtn: { fontSize: 18, padding: "6px 10px", cursor: "pointer" },
-  peerName: { fontWeight: 600 },
-  status: { fontSize: 12, color: "#666" },
-  messages: { padding: 12, flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 },
-  msgRow: { display: "flex" },
-  bubble: { maxWidth: "78%", padding: "8px 12px", borderRadius: 12, boxShadow: "0 1px 0 rgba(0,0,0,0.05)" },
-  msgText: { whiteSpace: "pre-wrap" },
-  msgMeta: { fontSize: 11, color: "#666", marginTop: 6 },
-  inputRow: { display: "flex", gap: 8, padding: 12, borderTop: "1px solid #eee" },
-  input: { flex: 1, borderRadius: 8, padding: 8, resize: "none" },
-  sendBtn: { padding: "8px 14px", borderRadius: 8, cursor: "pointer" },
 };
 
 export default ChatPanel;

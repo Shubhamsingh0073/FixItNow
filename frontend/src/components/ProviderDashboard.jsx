@@ -243,73 +243,113 @@ const ProviderDashboard = () => {
 
 
   // Get user data from localStorage
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      fetch('http://localhost:8087/users/me', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      })
-        .then(res => {
-          if (!res.ok) throw new Error("Network response was not ok");
-          return res.json();
-        })
-        .then(data => {
-          // Backend should return { id, name, email, phone }
-          setUserData({ id: data.id, name: data.name, email: data.email, phone: data.phone });
-          setPhoneInput(data.phone || ''); // If you use a separate state for phone input
-        })
-        .catch(err => {
-          console.error('Error fetching user:', err);
-        });
+  // --- Replace your existing "Get user data from localStorage" useEffect and the "Load conversations" useEffect with the block below ---
 
-      // Fetch availability and description
-      fetch('http://localhost:8087/service/me', {
-        method: 'GET',
+  // --- Replace your existing users/me and conversation useEffects with the following ---
+
+// Get user data from backend and store userId in state + localStorage
+useEffect(() => {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    console.error("No JWT found in localStorage. Please login.");
+    return;
+  }
+
+  // fetch profile
+  fetch('http://localhost:8087/users/me', {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  })
+    .then(res => {
+      if (!res.ok) throw new Error(`Failed to fetch user: ${res.status}`);
+      return res.json();
+    })
+    .then(data => {
+      setUserData({ id: data.id, name: data.name, email: data.email, phone: data.phone });
+      setPhoneInput(data.phone || '');
+      if (data.id) localStorage.setItem('userId', data.id);
+    })
+    .catch(err => {
+      console.error('Error fetching user:', err);
+    });
+
+  // fetch service/me once
+  fetch('http://localhost:8087/service/me', {
+    method: 'GET',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+  })
+    .then(res => res.ok ? res.json() : Promise.reject(`Failed to fetch service: ${res.status}`))
+    .then(data => {
+      if (data.availability) {
+        setAvailabilityFrom(data.availability.from);
+        setAvailabilityTo(data.availability.to);
+      }
+      if (data.description) setDescriptionInput(data.description);
+      if (data.category) setSelectedCategory(data.category);
+      if (data.subcategories) {
+        const savedServices = Object.entries(data.subcategories).map(([name, price]) => ({ name, price }));
+        setServices(savedServices);
+      }
+    })
+    .catch(err => console.error('Service fetch error:', err));
+}, []); // run once on mount
+
+
+// Load conversations when Chat page becomes active and userData.id is available
+useEffect(() => {
+  const loadConversations = async () => {
+    const token = localStorage.getItem('token');
+    const providerId = userData?.id || localStorage.getItem('userId');
+    if (!providerId) return;
+
+    setLoadingConversations(true);
+    try {
+      const url = `http://localhost:8087/api/chat/conversations?userId=${encodeURIComponent(providerId)}`;
+      console.log('Fetching conversations:', url);
+      const res = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         }
-      })
-        .then(res => res.ok ? res.json() : Promise.reject('Failed to fetch service'))
-        .then(data => {
-          if (data.availability) {
-            setAvailabilityFrom(data.availability.from);
-            setAvailabilityTo(data.availability.to);
-          }
-          if (data.description) setDescriptionInput(data.description);
-        })
-        .catch(err => console.error('Service fetch error:', err));
+      });
 
-      // fetch category and subcategories
-      fetch('http://localhost:8087/service/me', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      })
-        .then(res => res.ok ? res.json() : Promise.reject('Failed to fetch category data'))
-        .then(data => {
-          if (data.category) setSelectedCategory(data.category);
-          if (data.subcategories) {
-            const savedServices = Object.entries(data.subcategories).map(([name, price]) => ({
-              name,
-              price
-            }));
-            setServices(savedServices);
-          }
-        })
-        .catch(err => {
-          console.error('Category fetch error:', err);
-        });
-    } else {
-      console.error("No JWT found in localStorage. Please login.");
+      const text = await res.text(); // read raw body for robust logging
+      // If not OK, log the raw response and throw
+      if (!res.ok) {
+        console.error('Conversations fetch failed', res.status, text);
+        throw new Error(`Conversations fetch failed: ${res.status}`);
+      }
+
+      // Try parsing JSON; if parsing fails log the raw body for debugging
+      let arr;
+      try {
+        arr = JSON.parse(text);
+      } catch (parseErr) {
+        console.error('Failed to parse conversations JSON. Raw body:', text);
+        throw parseErr;
+      }
+
+      const convs = (arr || []).map(c => ({
+        peerId: c.peerId,
+        peerName: c.peerName || c.peer_name || c.peer || c.peerId,
+        lastMessage: c.lastMessage || c.last_message || '',
+        lastAt: c.lastAt || c.last_at || ''
+      }));
+      setConversations(convs);
+    } catch (err) {
+      console.error('Failed loading conversations', err);
+      setConversations([]);
+    } finally {
+      setLoadingConversations(false);
     }
-  }, []);
+  };
+
+  if (activePage === 'Chat' && (userData && userData.id)) loadConversations();
+}, [activePage, userData]);
+
 
 
   // Get geolocation and address using OpenStreetMap Nominatim
@@ -356,38 +396,6 @@ const ProviderDashboard = () => {
 
   }, []);
 
-  // Load conversations when Chat page becomes active
-  useEffect(() => {
-    const loadConversations = async () => {
-      const providerId = userData?.id || localStorage.getItem('userId');
-      if (!providerId) return;
-      setLoadingConversations(true);
-      try {
-        const url = `/api/chat/conversations?userId=${encodeURIComponent(providerId)}`;
-        const res = await fetch(url);
-        if (!res.ok) {
-          setConversations([]);
-          return;
-        }
-        const arr = await res.json();
-        // arr expected: [{ peerId, peerName, lastMessage, lastAt }, ...]
-        const convs = (arr || []).map(c => ({
-          peerId: c.peerId || c.peer_id || c.peerID,
-          peerName: c.peerName || c.peer_name || c.peerName || c.peerName,
-          lastMessage: c.lastMessage || c.last_message || '',
-          lastAt: c.lastAt || c.last_at || ''
-        }));
-        setConversations(convs);
-      } catch (err) {
-        console.error('Failed loading conversations', err);
-        setConversations([]);
-      } finally {
-        setLoadingConversations(false);
-      }
-    };
-
-    if (activePage === 'Chat') loadConversations();
-  }, [activePage, userData]);
 
   // Accept request
   const handleAcceptRequest = (customer) => {
@@ -632,12 +640,13 @@ const ProviderDashboard = () => {
           <button className={activePage === 'bookings' ? 'active' : ''} onClick={() => setActivePage('bookings')}>
             <FaCalendarAlt /> Bookings
           </button>
-          <button className={activePage === 'profile' ? 'active' : ''} onClick={() => setActivePage('profile')}>
-            <FaUserCircle /> Profile
-          </button>
           <button className={activePage === 'Chat' ? 'active' : ''} onClick={() => setActivePage('Chat')}>
             <FaFacebookMessenger /> Chat
           </button>
+          <button className={activePage === 'profile' ? 'active' : ''} onClick={() => setActivePage('profile')}>
+            <FaUserCircle /> Profile
+          </button>
+          
         </nav>
         <div className="sidebar-bottom">
           <button className="logout-button" onClick={handleLogout}>
@@ -730,32 +739,29 @@ const ProviderDashboard = () => {
             </div>
           </div>
         )}
+
+
         {/* Chat Page */}
         {activePage === 'Chat' && (
-          <div className="chat-page" style={{ display: 'flex', gap: 16, alignItems: 'stretch' }}>
-            <div style={{ width: 320, minHeight: 400, background: '#fff', borderRadius: 8, padding: 12, boxShadow: '0 4px 18px rgba(0,0,0,0.06)', overflowY: 'auto' }}>
-              <h3 style={{ marginTop: 0, marginBottom: 12 }}>Conversations</h3>
+          <div className="chat-page">
+            <div className="chat-sidebar">
+              <h3>Conversations</h3>
               {loadingConversations ? (
                 <div style={{ color: '#666' }}>Loading...</div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div className="conversations-list">
                   {conversations.length === 0 ? (
                     <div style={{ color: '#999' }}>No conversations yet.</div>
                   ) : (
                     conversations.map(conv => (
-                      <button key={conv.peerId}
+                      <button
+                        key={conv.peerId}
                         onClick={() => { setSelectedPeer(conv.peerId); setSelectedPeerName(conv.peerName || conv.peerId); }}
-                        style={{
-                          textAlign: 'left',
-                          padding: '10px',
-                          borderRadius: 8,
-                          border: selectedPeer === conv.peerId ? '2px solid #6156f8' : '1px solid #eee',
-                          background: selectedPeer === conv.peerId ? '#f7f5ff' : '#fff',
-                          cursor: 'pointer'
-                        }}
+                        className={`conversation-btn ${selectedPeer === conv.peerId ? 'active' : ''}`}
+                        type="button"
                       >
-                        <div style={{ fontWeight: 600 }}>{conv.peerName || conv.peerId}</div>
-                        <div style={{ fontSize: 12, color: '#666', marginTop: 6, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{conv.lastMessage}</div>
+                        <div className="conversation-peer">{conv.peerName || conv.peerId}</div>
+                        <div className="conversation-preview">{conv.lastMessage}</div>
                       </button>
                     ))
                   )}
@@ -763,7 +769,7 @@ const ProviderDashboard = () => {
               )}
             </div>
 
-            <div style={{ flex: 1, minHeight: 400, background: '#fff', borderRadius: 8, padding: 12, boxShadow: '0 4px 18px rgba(0,0,0,0.06)', display: 'flex', flexDirection: 'column' }}>
+            <div className="chat-main">
               {selectedPeer ? (
                 <ChatPanel
                   currentUserId={userData?.id || localStorage.getItem('userId')}
@@ -772,7 +778,7 @@ const ProviderDashboard = () => {
                   onBack={() => setSelectedPeer(null)}
                 />
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, color: '#666' }}>
+                <div className="chat-empty">
                   <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>No conversation selected</div>
                   <div>Select a person from the left to view and reply to messages.</div>
                 </div>

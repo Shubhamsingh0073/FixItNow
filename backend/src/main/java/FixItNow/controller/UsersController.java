@@ -7,6 +7,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import org.hibernate.boot.model.internal.Nullability;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +22,10 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Optional;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ContentDisposition;
 
 import FixItNow.model.ProviderDocument;
 import FixItNow.repository.ProviderDocumentRepository;
@@ -268,6 +274,72 @@ public class UsersController {
 	            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Collections.singletonMap("message", "Failed to fetch documents"));
 	        }
 	    }
+	    
+	    
+	    @GetMapping("/document/{documentId}")
+	    public ResponseEntity<?> streamDocumentById(@PathVariable String documentId) {
+	        try {
+	            Optional<ProviderDocument> opt = providerDocumentRepository.findById(documentId);
+	            if (opt.isEmpty()) {
+	                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+	                        .body(Collections.singletonMap("message", "Document not found"));
+	            }
+
+	            ProviderDocument doc = opt.get();
+	            Resource resource = fileStorageService.loadAsResource(doc.getStoragePath());
+	            if (resource == null) {
+	                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+	                        .body(Collections.singletonMap("message", "File not found on server"));
+	            }
+
+	            HttpHeaders headers = new HttpHeaders();
+	            headers.setContentType(MediaType.APPLICATION_PDF);
+	            headers.setContentDisposition(ContentDisposition.inline().filename(doc.getFilename()).build());
+	            return new ResponseEntity<>(resource, headers, HttpStatus.OK);
+	        } catch (Exception e) {
+	            e.printStackTrace();
+	            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+	                    .body(Collections.singletonMap("message", "Failed to stream document"));
+	        }
+	    }
+
+	    /**
+	     * Convenience: stream the first document for a provider id.
+	     * GET /users/document/provider/{providerId}
+	     */
+	    @GetMapping("/document/provider/{providerId}")
+	    public ResponseEntity<?> streamDocumentByProvider(@PathVariable String providerId) {
+	        try {
+	            Users provider = usersRepository.findById(providerId).orElse(null);
+	            if (provider == null) {
+	                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+	                        .body(Collections.singletonMap("message", "Provider not found"));
+	            }
+
+	            Optional<ProviderDocument> opt = providerDocumentRepository.findByProvider(provider);
+	            if (opt.isEmpty()) {
+	                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+	                        .body(Collections.singletonMap("message", "Document not found for provider"));
+	            }
+
+	            ProviderDocument doc = opt.get();
+	            Resource resource = fileStorageService.loadAsResource(doc.getStoragePath());
+	            if (resource == null) {
+	                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+	                        .body(Collections.singletonMap("message", "File not found on server"));
+	            }
+
+	            HttpHeaders headers = new HttpHeaders();
+	            headers.setContentType(MediaType.APPLICATION_PDF);
+	            headers.setContentDisposition(ContentDisposition.inline().filename(doc.getFilename()).build());
+	            return new ResponseEntity<>(resource, headers, HttpStatus.OK);
+	        } catch (Exception e) {
+	            e.printStackTrace();
+	            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+	                    .body(Collections.singletonMap("message", "Failed to stream document"));
+	        }
+	    }
+	    
     
     // GET /users/me
     @GetMapping("/me")
@@ -290,6 +362,7 @@ public class UsersController {
                     .body(Collections.singletonMap("message", "User not found"));
         }
         Map<String, String> response = new HashMap<>();
+        response.put("id", user.getId());
         response.put("name", user.getName());
         response.put("email", user.getEmail());
         response.put("phone", user.getPhno());
@@ -384,6 +457,7 @@ public class UsersController {
 
                 // category (plain string)
                 profile.put("category", service.getCategory() == null ? "" : service.getCategory());
+                profile.put("verified", service.getVerified() == null ? "" : service.getVerified());
 
                 // subcategories: stored as JSON string in TEXT column; deserialize to Map
                 try {
@@ -403,6 +477,7 @@ public class UsersController {
                 profile.put("description", "");
                 profile.put("availability", new HashMap<String, Object>());
                 profile.put("category", "");
+                profile.put("verifed", "");
                 profile.put("subcategory", new HashMap<String, Object>());
             }
 

@@ -4,14 +4,20 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.stream.Collectors;
 
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import FixItNow.model.Message;
+import FixItNow.model.MessageDTO;
 import FixItNow.model.ConversationSummary;
 import FixItNow.repository.MessageRepository;
+
+
+@CrossOrigin(origins = "*")
 
 @RestController
 public class ChatController {
@@ -22,9 +28,18 @@ public class ChatController {
         this.messageRepository = messageRepository;
     }
 
+    // Return history as array of simple DTOs
     @GetMapping("/api/chat/history")
-    public List<Message> getHistory(@RequestParam String userA, @RequestParam String userB) {
-        return messageRepository.findConversation(userA, userB);
+    public List<MessageDTO> getHistory(@RequestParam String userA, @RequestParam String userB) {
+        List<Message> msgs = messageRepository.findConversation(userA, userB);
+        return msgs.stream()
+                .map(m -> new MessageDTO(
+                        m.getId(),
+                        m.getSender() != null ? m.getSender().getId() : null,
+                        m.getReceiver() != null ? m.getReceiver().getId() : null,
+                        m.getContent(),
+                        m.getSentAt()))
+                .collect(Collectors.toList());
     }
 
     /**
@@ -32,22 +47,18 @@ public class ChatController {
      */
     @GetMapping("/api/chat/conversations")
     public List<ConversationSummary> getConversations(@RequestParam String userId) {
-        // fetch all messages where user is either sender or receiver, newest first
         List<Message> msgs = messageRepository.findBySender_IdOrReceiver_IdOrderBySentAtDesc(userId, userId);
 
-        // preserve insertion order -> newest first encountered
         Map<String, ConversationSummary> map = new LinkedHashMap<>();
 
         for (Message m : msgs) {
             String peerId = null;
             String peerName = null;
             if (m.getSender() != null && userId.equals(m.getSender().getId())) {
-                // peer is receiver
                 if (m.getReceiver() == null) continue;
                 peerId = m.getReceiver().getId();
                 peerName = m.getReceiver().getName();
             } else if (m.getReceiver() != null && userId.equals(m.getReceiver().getId())) {
-                // peer is sender
                 if (m.getSender() == null) continue;
                 peerId = m.getSender().getId();
                 peerName = m.getSender().getName();
@@ -55,7 +66,6 @@ public class ChatController {
 
             if (peerId == null) continue;
 
-            // If we already have this peer, skip because msgs are ordered newest-first
             if (!map.containsKey(peerId)) {
                 ConversationSummary s = new ConversationSummary(peerId, peerName, m.getContent(), m.getSentAt());
                 map.put(peerId, s);
