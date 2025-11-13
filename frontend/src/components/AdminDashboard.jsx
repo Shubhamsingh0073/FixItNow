@@ -53,7 +53,7 @@ const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState("home");
   const [manageUsers, setManageUsers] = useState(false);
   const [manageProviders, setManageProviders] = useState(false);
-  const [users, setUsers] = useState(userExamples);
+  const [users, setUsers] = useState([]);
   const [providers, setProviders] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [bookings, setBookings] = useState([]);
@@ -98,6 +98,38 @@ const AdminDashboard = () => {
     };
     fetchProviders();
   }, []);
+
+  // Build a unified users list (customers + providers) for the dashboard users table
+  useEffect(() => {
+    const merged = [];
+    if (Array.isArray(customers)) {
+      for (const c of customers) {
+        merged.push({
+          id: c.id ?? c.userId ?? c._id ?? null,
+          name: c.name ?? c.customerName ?? c.customer?.name ?? '',
+          email: c.email ?? c.customerEmail ?? c.customer?.email ?? '',
+          role: 'Customer',
+          createdOn: c.createdOn ?? c.created_at ?? c.createdAt ?? ''
+        });
+      }
+    }
+
+    if (Array.isArray(providers)) {
+      for (const p of providers) {
+        // providers may be a services list where nested provider object contains user info
+        const providerObj = p.provider ?? p;
+        merged.push({
+          id: providerObj.id ?? providerObj._id ?? p.id ?? null,
+          name: providerObj.name ?? providerObj.fullName ?? '',
+          email: providerObj.email ?? '',
+          role: 'Provider',
+          createdOn: providerObj.createdOn ?? providerObj.created_at ?? providerObj.createdAt ?? ''
+        });
+      }
+    }
+
+    setUsers(merged);
+  }, [customers, providers]);
 
   useEffect(() => {
     const fetchReports = async () => {
@@ -381,6 +413,94 @@ const AdminDashboard = () => {
     { value: pendingApprovalsCount, label: "Pending Approvals" },
   ], [customers, activeBookingsCount, verifiedProvidersCount, pendingApprovalsCount]);
 
+  // --- Chart data aggregations ---------------------------------------
+  // Small inline SVG pie chart component
+  const SmallPieChart = ({ data = [], size = 180, colors = [] }) => {
+    if (!Array.isArray(data) || data.length === 0) return <div style={{ color: '#888' }}>No data</div>;
+    const total = data.reduce((s, d) => s + (Number(d.value) || 0), 0);
+    if (total === 0) return <div style={{ color: '#888' }}>No data</div>;
+
+    const cx = size / 2;
+    const cy = size / 2;
+    const r = Math.min(cx, cy) - 4;
+    let angle = -Math.PI / 2; // start at top
+
+    const defaultColors = ['#6156f8', '#2b6cb0', '#48bb78', '#f6ad55', '#ed64a6', '#9f7aea'];
+
+    const slices = data.map((d, i) => {
+      const value = Number(d.value) || 0;
+      const frac = value / total;
+      const start = angle;
+      const end = angle + frac * Math.PI * 2;
+      angle = end;
+      const large = end - start > Math.PI ? 1 : 0;
+      const x1 = cx + r * Math.cos(start);
+      const y1 = cy + r * Math.sin(start);
+      const x2 = cx + r * Math.cos(end);
+      const y2 = cy + r * Math.sin(end);
+      const path = `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`;
+      return { path, color: colors[i] || defaultColors[i % defaultColors.length], label: d.label, value };
+    });
+
+    return (
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+        <svg width={size} height={size} style={{ flex: '0 0 auto' }}>
+          {slices.map((s, i) => (
+            <path key={i} d={s.path} fill={s.color} stroke="#fff" strokeWidth={1} />
+          ))}
+        </svg>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {slices.map((s, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 120 }}>
+              <span style={{ width: 12, height: 12, background: s.color, display: 'inline-block', borderRadius: 3 }} />
+              <span style={{ fontSize: 13, color: '#333' }}>{s.label}</span>
+              <span style={{ marginLeft: 8, color: '#666' }}>({s.value})</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const topServices = useMemo(() => {
+    if (!Array.isArray(bookings)) return [];
+    const map = {};
+    for (const b of bookings) {
+      const svc = (b.service && (b.service.name || b.service.category)) || (b.serviceCategory) || (b.serviceName) || 'Unknown';
+      map[svc] = (map[svc] || 0) + 1;
+    }
+    const arr = Object.entries(map).map(([label, value]) => ({ label, value }));
+    arr.sort((a, b) => b.value - a.value);
+    return arr.slice(0, 6);
+  }, [bookings]);
+
+  
+
+  const topProviders = useMemo(() => {
+    if (!Array.isArray(bookings)) return [];
+    const map = {};
+    for (const b of bookings) {
+      const pname = (b.provider && (b.provider.name || b.provider.fullName)) || (b.providerName) || 'Unknown';
+      map[pname] = (map[pname] || 0) + 1;
+    }
+    const arr = Object.entries(map).map(([label, value]) => ({ label, value }));
+    arr.sort((a, b) => b.value - a.value);
+    return arr.slice(0, 6);
+  }, [bookings]);
+
+  const locationTrends = useMemo(() => {
+    if (!Array.isArray(bookings)) return [];
+    const map = {};
+    for (const b of bookings) {
+      const loc = (b.customer && (b.customer.location || b.customer.customerLocation)) || b.location || 'Unknown';
+      map[loc] = (map[loc] || 0) + 1;
+    }
+    const arr = Object.entries(map).map(([label, value]) => ({ label, value }));
+    arr.sort((a, b) => b.value - a.value);
+    return arr.slice(0, 6);
+  }, [bookings]);
+  // --------------------------------------------------------------------
+
   // only approved providers for Services tab
   const approvedProviders = useMemo(() => {
     if (!Array.isArray(providers)) return [];
@@ -624,6 +744,26 @@ const AdminDashboard = () => {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            </div>
+            {/* Charts: Most booked services, Top providers, Location trends */}
+            <div style={{ marginTop: 20 }}>
+              <h3 style={{ marginBottom: 12 }}>Analytics</h3>
+              <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                <div style={{ flex: '1 1 360px', background: '#fff', padding: 12, borderRadius: 8, boxShadow: '0 4px 18px rgba(0,0,0,0.04)' }}>
+                  <div style={{ fontWeight: 700, marginBottom: 8 }}>Most booked services</div>
+                  <SmallPieChart data={topServices} size={180} />
+                </div>
+
+                <div style={{ flex: '1 1 360px', background: '#fff', padding: 12, borderRadius: 8, boxShadow: '0 4px 18px rgba(0,0,0,0.04)' }}>
+                  <div style={{ fontWeight: 700, marginBottom: 8 }}>Top providers</div>
+                  <SmallPieChart data={topProviders} size={180} colors={['#2b6cb0','#2a4365','#2c5282','#2f855a','#234e52']} />
+                </div>
+
+                <div style={{ flex: '1 1 360px', background: '#fff', padding: 12, borderRadius: 8, boxShadow: '0 4px 18px rgba(0,0,0,0.04)' }}>
+                  <div style={{ fontWeight: 700, marginBottom: 8 }}>Location trends</div>
+                  <SmallPieChart data={locationTrends} size={180} colors={['#48bb78','#2f855a','#38a169','#68d391','#9ae6b4']} />
+                </div>
               </div>
             </div>
           </>
