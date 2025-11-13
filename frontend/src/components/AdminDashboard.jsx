@@ -83,6 +83,16 @@ const AdminDashboard = () => {
   const [docModalUrl, setDocModalUrl] = useState(null); // blob URL when using modal fallback
   const [docModalOpen, setDocModalOpen] = useState(false);
   const [docLoading, setDocLoading] = useState(false);
+  // timeframe for service analytics: 'this_month' | 'last_3' | 'last_6' | 'custom'
+  const [serviceTimeframe, setServiceTimeframe] = useState('last_3');
+  const [serviceCustomMonth, setServiceCustomMonth] = useState('');
+  const [providerTimeframe, setProviderTimeframe] = useState('last_3');
+  const [providerCustomMonth, setProviderCustomMonth] = useState('');
+  // location filter for location trends: 'state' | 'city' | 'district'
+  const [locationFilter, setLocationFilter] = useState('state');
+  // timeframe for total bookings chart
+  const [bookingsTimeframe, setBookingsTimeframe] = useState('last_3');
+  const [bookingsCustomMonth, setBookingsCustomMonth] = useState('');
 
   useEffect(() => {
     const fetchProviders = async () => {
@@ -462,6 +472,111 @@ const AdminDashboard = () => {
     );
   };
 
+  // Helper: compute months range and labels for timeframe
+  const computeRange = (timeframe, customMonthVal) => {
+    const now = new Date();
+    let start = new Date(now.getFullYear(), now.getMonth(), 1);
+    let end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    if (timeframe === 'last_3') {
+      start = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+      end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    } else if (timeframe === 'last_6') {
+      start = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+      end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    } else if (timeframe === 'custom' && customMonthVal) {
+      const parts = customMonthVal.split('-');
+      if (parts.length === 2) {
+        const y = Number(parts[0]);
+        const m = Number(parts[1]) - 1;
+        if (!Number.isNaN(y) && !Number.isNaN(m)) {
+          start = new Date(y, m, 1);
+          end = new Date(y, m + 1, 1);
+        }
+      }
+    }
+    const months = [];
+    const cur = new Date(start.getFullYear(), start.getMonth(), 1);
+    while (cur < end) {
+      months.push(new Date(cur.getFullYear(), cur.getMonth(), 1));
+      cur.setMonth(cur.getMonth() + 1);
+    }
+    const monthLabels = months.map(d => d.toLocaleString(undefined, { month: 'short', year: 'numeric' }));
+    return { start, end, months, monthLabels };
+  };
+
+  // Helper: abbreviate large numbers (e.g. 1200 -> 1.2k)
+  const abbreviateNumber = (n) => {
+    const num = Number(n || 0);
+    if (isNaN(num)) return String(n);
+    const abs = Math.abs(num);
+    if (abs < 1000) return String(num);
+    const units = ['k', 'M', 'B', 'T'];
+    let value = num;
+    let idx = -1;
+    while (Math.abs(value) >= 1000 && idx < units.length - 1) {
+      value = value / 1000;
+      idx += 1;
+    }
+    return `${Number(value.toFixed(1))}${units[idx]}`;
+  };
+
+  // Month-wise stacked bar chart: months along X, stacked segments per service
+  const SmallMonthStackedBarChart = ({ services = [], monthLabels = [], valuesByMonth = [], colors = [] }) => {
+    if (!Array.isArray(valuesByMonth) || valuesByMonth.length === 0) return <div style={{ color: '#888' }}>No data</div>;
+    const defaultColors = ['#4f46e5', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+    const monthTotals = valuesByMonth.map(arr => arr.reduce((a, b) => a + Number(b || 0), 0));
+    const max = Math.max(...monthTotals, 1);
+    const chartHeight = 160;
+    return (
+      <div>
+        {/* Chart area with totals above each month's stacked bar */}
+        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
+          {valuesByMonth.map((vals, mi) => (
+            <div key={mi} style={{ width: 56, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              {/* numeric total above the bar - hide if zero, show abbreviated with full value in title/aria */}
+              {Number(monthTotals[mi]) > 0 ? (
+                <div
+                  role="img"
+                  aria-label={`Total ${monthTotals[mi]} for ${monthLabels[mi]}`}
+                  title={`${monthTotals[mi]} total`}
+                  style={{ fontSize: 12, color: '#333', marginBottom: 6 }}
+                >
+                  {abbreviateNumber(monthTotals[mi])}
+                </div>
+              ) : (
+                <div style={{ height: 18 }} />
+              )}
+              {/* stacked bar area */}
+              <div
+                role="img"
+                aria-label={`${monthLabels[mi]} stacked bar, total ${monthTotals[mi]}`}
+                style={{ height: chartHeight, display: 'flex', flexDirection: 'column-reverse', width: '100%', borderRadius: 6, overflow: 'hidden', background: '#fff', boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.03)' }}
+              >
+                {vals.map((v, si) => {
+                  const h = Math.round((Number(v || 0) / max) * chartHeight);
+                  return <div key={si} title={`${services[si]}: ${v}`} style={{ height: h, background: colors[si] || defaultColors[si % defaultColors.length], width: '100%' }} />;
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+          {monthLabels.map((m, i) => (
+            <div key={i} style={{ width: 56, textAlign: 'center', fontSize: 12, color: '#333' }}>{m.split(' ')[0]}</div>
+          ))}
+        </div>
+        <div style={{ marginTop: 10, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          {services.map((s, i) => (
+            <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <span style={{ width: 12, height: 12, background: colors[i] || defaultColors[i % defaultColors.length], display: 'inline-block', borderRadius: 3 }} />
+              <div style={{ fontSize: 13, color: '#333' }}>{s}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   const topServices = useMemo(() => {
     if (!Array.isArray(bookings)) return [];
     const map = {};
@@ -488,17 +603,37 @@ const AdminDashboard = () => {
     return arr.slice(0, 6);
   }, [bookings]);
 
+  // Helper: extract location component (state, city, or district) from location string
+  // Assumes format like "City, District, State" or "City, State"
+  const extractLocationComponent = (location, component) => {
+    if (!location || typeof location !== 'string') return 'Unknown';
+    const parts = location.split(',').map(p => p.trim()).filter(p => p);
+    
+    if (component === 'state') {
+      // state is typically the last part
+      return parts.length > 0 ? parts[parts.length - 1] : 'Unknown';
+    } else if (component === 'city') {
+      // city is typically the first part
+      return parts.length > 0 ? parts[0] : 'Unknown';
+    } else if (component === 'district') {
+      // district is typically the middle part (if 3+ parts exist)
+      return parts.length > 2 ? parts[1] : (parts.length > 1 ? parts[1] : 'Unknown');
+    }
+    return 'Unknown';
+  };
+
   const locationTrends = useMemo(() => {
     if (!Array.isArray(bookings)) return [];
     const map = {};
     for (const b of bookings) {
       const loc = (b.customer && (b.customer.location || b.customer.customerLocation)) || b.location || 'Unknown';
-      map[loc] = (map[loc] || 0) + 1;
+      const component = extractLocationComponent(loc, locationFilter);
+      map[component] = (map[component] || 0) + 1;
     }
     const arr = Object.entries(map).map(([label, value]) => ({ label, value }));
     arr.sort((a, b) => b.value - a.value);
     return arr.slice(0, 6);
-  }, [bookings]);
+  }, [bookings, locationFilter]);
   // --------------------------------------------------------------------
 
   // only approved providers for Services tab
@@ -746,23 +881,433 @@ const AdminDashboard = () => {
                 </table>
               </div>
             </div>
-            {/* Charts: Most booked services, Top providers, Location trends */}
+            {/* Charts: 2x2 Grid Layout */}
             <div style={{ marginTop: 20 }}>
               <h3 style={{ marginBottom: 12 }}>Analytics</h3>
-              <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                <div style={{ flex: '1 1 360px', background: '#fff', padding: 12, borderRadius: 8, boxShadow: '0 4px 18px rgba(0,0,0,0.04)' }}>
-                  <div style={{ fontWeight: 700, marginBottom: 8 }}>Most booked services</div>
-                  <SmallPieChart data={topServices} size={180} />
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16, position: 'relative' }}>
+                {/* Row 1, Col 1: Most booked services */}
+                <div style={{ background: '#fff', padding: 12, borderRadius: 8, boxShadow: '0 4px 18px rgba(0,0,0,0.04)', minHeight: 500 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ fontWeight: 700, marginBottom: 8 }}>Most booked services (month-wise)</div>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <select value={serviceTimeframe} onChange={(e) => setServiceTimeframe(e.target.value)} style={{ padding: '6px 8px', fontSize: 13 }}>
+                        <option value="this_month">This month</option>
+                        <option value="last_3">Last 3 months</option>
+                        <option value="last_6">Last 6 months</option>
+                        <option value="custom">Select month</option>
+                      </select>
+                      {serviceTimeframe === 'custom' && (
+                      <input type="month" value={serviceCustomMonth} onChange={(e) => setServiceCustomMonth(e.target.value)} style={{ padding: '6px 8px', fontSize: 13 }} />
+                      )}
+                    </div>
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    {
+                      (() => {
+                        const { months, monthLabels } = computeRange(serviceTimeframe, serviceCustomMonth);
+                        if (!months || months.length === 0) return <div style={{ color: '#888' }}>No data</div>;
+
+                        // build svcMap: service -> counts per month index
+                        const svcMap = {};
+                        const resolveDate = (b) => {
+                          if (!b) return null;
+                          const candidates = [b.createdAt, b.created_at, b.date, b.bookingDate, b.bookedAt, b.createdOn];
+                          for (const c of candidates) {
+                            if (!c) continue;
+                            const d = new Date(c);
+                            if (!isNaN(d)) return d;
+                          }
+                          if (typeof b === 'number' || (typeof b === 'string' && /^\d+$/.test(b))) {
+                            const d = new Date(Number(b));
+                            if (!isNaN(d)) return d;
+                          }
+                          return null;
+                        };
+
+                        for (const b of bookings) {
+                          const d = resolveDate(b);
+                          if (!d) continue;
+                          // within range
+                          if (d < months[0] || d >= new Date(months[months.length - 1].getFullYear(), months[months.length - 1].getMonth() + 1, 1)) continue;
+                          const svc = (b.service && (b.service.name || b.service.category)) || (b.serviceCategory) || (b.serviceName) || (b.bookedService) || 'Unknown';
+                          if (!svcMap[svc]) svcMap[svc] = Array(months.length).fill(0);
+                          for (let mi = 0; mi < months.length; mi++) {
+                            const sStart = months[mi];
+                            const sEnd = new Date(sStart.getFullYear(), sStart.getMonth() + 1, 1);
+                            if (d >= sStart && d < sEnd) {
+                              svcMap[svc][mi]++;
+                              break;
+                            }
+                          }
+                        }
+
+                        // determine top services by total across range
+                        const svcArr = Object.entries(svcMap).map(([label, values]) => ({ label, values, total: values.reduce((a, b) => a + b, 0) }));
+                        svcArr.sort((a, b) => b.total - a.total);
+                        const topServicesList = svcArr.slice(0, 6);
+                        if (topServicesList.length === 0) return <div style={{ color: '#888' }}>No data</div>;
+
+                        // Calculate % change: current period vs previous (for top 6 services)
+                        let currentServicesTotal = 0;
+                        let prevServicesTotal = 0;
+                        for (const s of topServicesList) {
+                          currentServicesTotal += s.total;
+                        }
+                        
+                        let percentChangeServices = 0;
+                        if (serviceTimeframe !== 'custom') {
+                          let prevStart, prevEnd;
+                          if (serviceTimeframe === 'this_month') {
+                            const prevMonth = new Date(months[0].getFullYear(), months[0].getMonth() - 1, 1);
+                            prevStart = prevMonth;
+                            prevEnd = new Date(prevMonth.getFullYear(), prevMonth.getMonth() + 1, 1);
+                          } else if (serviceTimeframe === 'last_3') {
+                            prevStart = new Date(months[0].getFullYear(), months[0].getMonth() - 3, 1);
+                            prevEnd = months[0];
+                          } else if (serviceTimeframe === 'last_6') {
+                            prevStart = new Date(months[0].getFullYear(), months[0].getMonth() - 6, 1);
+                            prevEnd = months[0];
+                          }
+                          
+                          if (prevStart && prevEnd) {
+                            // Count previous period bookings for same top 6 services
+                            const topServiceNames = new Set(topServicesList.map(s => s.label));
+                            for (const b of bookings) {
+                              const d = resolveDate(b);
+                              if (!d) continue;
+                              if (d >= prevStart && d < prevEnd) {
+                                const svc = (b.service && (b.service.name || b.service.category)) || (b.serviceCategory) || (b.serviceName) || (b.bookedService) || 'Unknown';
+                                if (topServiceNames.has(svc)) {
+                                  prevServicesTotal++;
+                                }
+                              }
+                            }
+                            percentChangeServices = prevServicesTotal === 0 ? (currentServicesTotal > 0 ? 100 : 0) : ((currentServicesTotal - prevServicesTotal) / prevServicesTotal) * 100;
+                          }
+                        }
+
+                        const services = topServicesList.map(s => s.label);
+                        const valuesByMonth = topServicesList[0].values.map((_, mi) => topServicesList.map(s => s.values[mi]));
+                        const colors = ['#4f46e5', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+                        const changeColorSvc = percentChangeServices > 0 ? '#10b981' : percentChangeServices < 0 ? '#ef4444' : '#999';
+                        const changeSymbolSvc = percentChangeServices > 0 ? '↑' : percentChangeServices < 0 ? '↓' : '→';
+                        
+                        return (
+                          <div>
+                            {serviceTimeframe !== 'custom' && (
+                              <div style={{ marginBottom: 12, padding: 8, background: '#f0f9ff', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span style={{ fontSize: 13, color: '#333' }}>vs previous:</span>
+                                <span style={{ fontSize: 14, fontWeight: 600, color: changeColorSvc }}>
+                                  {changeSymbolSvc} {Math.abs(percentChangeServices).toFixed(1)}%
+                                </span>
+                                <span style={{ fontSize: 12, color: '#666' }}>({prevServicesTotal} → {currentServicesTotal})</span>
+                              </div>
+                            )}
+                            <SmallMonthStackedBarChart services={services} monthLabels={monthLabels} valuesByMonth={valuesByMonth} colors={colors} />
+                          </div>
+                        );
+                      })()
+                    }
+                  </div>
                 </div>
 
-                <div style={{ flex: '1 1 360px', background: '#fff', padding: 12, borderRadius: 8, boxShadow: '0 4px 18px rgba(0,0,0,0.04)' }}>
-                  <div style={{ fontWeight: 700, marginBottom: 8 }}>Top providers</div>
-                  <SmallPieChart data={topProviders} size={180} colors={['#2b6cb0','#2a4365','#2c5282','#2f855a','#234e52']} />
+                {/* Row 1, Col 2: Top providers */}
+                <div style={{ background: '#fff', padding: 12, borderRadius: 8, boxShadow: '0 4px 18px rgba(0,0,0,0.04)', minHeight: 500 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ fontWeight: 700, marginBottom: 8 }}>Top providers (month-wise)</div>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <select value={providerTimeframe} onChange={(e) => setProviderTimeframe(e.target.value)} style={{ padding: '6px 8px', fontSize: 13 }}>
+                          <option value="this_month">This month</option>
+                          <option value="last_3">Last 3 months</option>
+                          <option value="last_6">Last 6 months</option>
+                          <option value="custom">Select month</option>
+                        </select>
+                        {providerTimeframe === 'custom' && (
+                        <input type="month" value={providerCustomMonth} onChange={(e) => setProviderCustomMonth(e.target.value)} style={{ padding: '6px 8px', fontSize: 13 }} />
+                      )}
+                      </div>
+                    </div>
+                    <div style={{ marginTop: 8 }}>
+                      {
+                        (() => {
+                            const { months, monthLabels } = computeRange(providerTimeframe, providerCustomMonth);
+                          if (!months || months.length === 0) return <div style={{ color: '#888' }}>No data</div>;
+
+                          const provMap = {};
+                          const resolveDate = (b) => {
+                            if (!b) return null;
+                            const candidates = [b.createdAt, b.created_at, b.date, b.bookingDate, b.bookedAt, b.createdOn];
+                            for (const c of candidates) {
+                              if (!c) continue;
+                              const d = new Date(c);
+                              if (!isNaN(d)) return d;
+                            }
+                            if (typeof b === 'number' || (typeof b === 'string' && /^\d+$/.test(b))) {
+                              const d = new Date(Number(b));
+                              if (!isNaN(d)) return d;
+                            }
+                            return null;
+                          };
+
+                          const resolveProviderName = (b) => {
+                            if (!b) return 'Unknown';
+                            const p = b.provider;
+                            const candidates = [
+                              p?.name,
+                              p?.fullName,
+                              p?.providerName,
+                              p?.displayName,
+                              p?.username,
+                              p?.user?.name,
+                              b.providerName,
+                              b.provider_name,
+                            ];
+                            for (const c of candidates) {
+                              if (c) return String(c);
+                            }
+                            if (typeof p === 'string' || typeof p === 'number') return String(p);
+                            if (b.providerId || b.provider_id) return String(b.providerId || b.provider_id);
+                            return 'Unknown';
+                          };
+
+                          for (const b of bookings) {
+                            const d = resolveDate(b);
+                            if (!d) continue;
+                            if (d < months[0] || d >= new Date(months[months.length - 1].getFullYear(), months[months.length - 1].getMonth() + 1, 1)) continue;
+                            const pname = resolveProviderName(b) || 'Unknown';
+                            if (!provMap[pname]) provMap[pname] = Array(months.length).fill(0);
+                            for (let mi = 0; mi < months.length; mi++) {
+                              const sStart = months[mi];
+                              const sEnd = new Date(sStart.getFullYear(), sStart.getMonth() + 1, 1);
+                              if (d >= sStart && d < sEnd) {
+                                provMap[pname][mi]++;
+                                break;
+                              }
+                            }
+                          }
+
+                          const provArr = Object.entries(provMap).map(([label, values]) => ({ label, values, total: values.reduce((a, b) => a + b, 0) }));
+                          provArr.sort((a, b) => b.total - a.total);
+                          const topProv = provArr.slice(0, 6);
+                          if (topProv.length === 0) return <div style={{ color: '#888' }}>No data</div>;
+
+                          // Calculate % change: current period vs previous (for top 6 providers)
+                          let currentProvidersTotal = 0;
+                          let prevProvidersTotal = 0;
+                          for (const p of topProv) {
+                            currentProvidersTotal += p.total;
+                          }
+                          
+                          let percentChangeProviders = 0;
+                          if (providerTimeframe !== 'custom') {
+                            let prevStart, prevEnd;
+                            if (providerTimeframe === 'this_month') {
+                              const prevMonth = new Date(months[0].getFullYear(), months[0].getMonth() - 1, 1);
+                              prevStart = prevMonth;
+                              prevEnd = new Date(prevMonth.getFullYear(), prevMonth.getMonth() + 1, 1);
+                            } else if (providerTimeframe === 'last_3') {
+                              prevStart = new Date(months[0].getFullYear(), months[0].getMonth() - 3, 1);
+                              prevEnd = months[0];
+                            } else if (providerTimeframe === 'last_6') {
+                              prevStart = new Date(months[0].getFullYear(), months[0].getMonth() - 6, 1);
+                              prevEnd = months[0];
+                            }
+                            
+                            if (prevStart && prevEnd) {
+                              // Count previous period bookings for same top 6 providers
+                              const topProviderNames = new Set(topProv.map(p => p.label));
+                              for (const b of bookings) {
+                                const d = resolveDate(b);
+                                if (!d) continue;
+                                if (d >= prevStart && d < prevEnd) {
+                                  const pname = (b.provider && (b.provider.name || b.provider.fullName)) || (b.providerName) || 'Unknown';
+                                  if (topProviderNames.has(pname)) {
+                                    prevProvidersTotal++;
+                                  }
+                                }
+                              }
+                              percentChangeProviders = prevProvidersTotal === 0 ? (currentProvidersTotal > 0 ? 100 : 0) : ((currentProvidersTotal - prevProvidersTotal) / prevProvidersTotal) * 100;
+                            }
+                          }
+
+                          const providersLabels = topProv.map(p => p.label);
+                          const valuesByMonth = topProv[0].values.map((_, mi) => topProv.map(p => p.values[mi]));
+                          const colors = ['#2b6cb0', '#2a4365', '#2c5282', '#2f855a', '#234e52', '#1e3a8a'];
+                          const changeColorProv = percentChangeProviders > 0 ? '#10b981' : percentChangeProviders < 0 ? '#ef4444' : '#999';
+                          const changeSymbolProv = percentChangeProviders > 0 ? '↑' : percentChangeProviders < 0 ? '↓' : '→';
+                          
+                          return (
+                            <div>
+                              {providerTimeframe !== 'custom' && (
+                                <div style={{ marginBottom: 12, padding: 8, background: '#f0f9ff', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                  <span style={{ fontSize: 13, color: '#333' }}>vs previous:</span>
+                                  <span style={{ fontSize: 14, fontWeight: 600, color: changeColorProv }}>
+                                    {changeSymbolProv} {Math.abs(percentChangeProviders).toFixed(1)}%
+                                  </span>
+                                  <span style={{ fontSize: 12, color: '#666' }}>({prevProvidersTotal} → {currentProvidersTotal})</span>
+                                </div>
+                              )}
+                              <SmallMonthStackedBarChart services={providersLabels} monthLabels={monthLabels} valuesByMonth={valuesByMonth} colors={colors} />
+                            </div>
+                          );
+                        })()
+                      }
+                    </div>
                 </div>
 
-                <div style={{ flex: '1 1 360px', background: '#fff', padding: 12, borderRadius: 8, boxShadow: '0 4px 18px rgba(0,0,0,0.04)' }}>
-                  <div style={{ fontWeight: 700, marginBottom: 8 }}>Location trends</div>
+                {/* Row 2, Col 1: Location trends */}
+                <div style={{ background: '#fff', padding: 12, borderRadius: 8, boxShadow: '0 4px 18px rgba(0,0,0,0.04)', minHeight: 500 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ fontWeight: 700, marginBottom: 8 }}>Location trends</div>
+                    <select value={locationFilter} onChange={(e) => setLocationFilter(e.target.value)} style={{ padding: '6px 8px', fontSize: 13 }}>
+                      <option value="state">State</option>
+                      <option value="city">City</option>
+                      <option value="district">District</option>
+                    </select>
+                  </div>
                   <SmallPieChart data={locationTrends} size={180} colors={['#48bb78','#2f855a','#38a169','#68d391','#9ae6b4']} />
+                </div>
+
+                {/* Row 2, Col 2: Total bookings */}
+                <div style={{ background: '#fff', padding: 12, borderRadius: 8, boxShadow: '0 4px 18px rgba(0,0,0,0.04)', minHeight: 500 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ fontWeight: 700, marginBottom: 8 }}>Total bookings (month-wise)</div>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <select value={bookingsTimeframe} onChange={(e) => setBookingsTimeframe(e.target.value)} style={{ padding: '6px 8px', fontSize: 13 }}>
+                        <option value="this_month">This month</option>
+                        <option value="last_3">Last 3 months</option>
+                        <option value="last_6">Last 6 months</option>
+                        <option value="custom">Select month</option>
+                      </select>
+                      {bookingsTimeframe === 'custom' && (
+                      <input type="month" value={bookingsCustomMonth} onChange={(e) => setBookingsCustomMonth(e.target.value)} style={{ padding: '6px 8px', fontSize: 13 }} />
+                      )}
+                    </div>
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    {
+                      (() => {
+                        const { months, monthLabels } = computeRange(bookingsTimeframe, bookingsCustomMonth);
+                        if (!months || months.length === 0) return <div style={{ color: '#888' }}>No data</div>;
+
+                        const resolveDate = (b) => {
+                          if (!b) return null;
+                          const candidates = [b.createdAt, b.created_at, b.date, b.bookingDate, b.bookedAt, b.createdOn];
+                          for (const c of candidates) {
+                            if (!c) continue;
+                            const d = new Date(c);
+                            if (!isNaN(d)) return d;
+                          }
+                          if (typeof b === 'number' || (typeof b === 'string' && /^\d+$/.test(b))) {
+                            const d = new Date(Number(b));
+                            if (!isNaN(d)) return d;
+                          }
+                          return null;
+                        };
+
+                        // Count total bookings per month
+                        const monthCounts = Array(months.length).fill(0);
+                        for (const b of bookings) {
+                          const d = resolveDate(b);
+                          if (!d) continue;
+                          if (d < months[0] || d >= new Date(months[months.length - 1].getFullYear(), months[months.length - 1].getMonth() + 1, 1)) continue;
+                          for (let mi = 0; mi < months.length; mi++) {
+                            const sStart = months[mi];
+                            const sEnd = new Date(sStart.getFullYear(), sStart.getMonth() + 1, 1);
+                            if (d >= sStart && d < sEnd) {
+                              monthCounts[mi]++;
+                              break;
+                            }
+                          }
+                        }
+
+                        if (monthCounts.every(c => c === 0)) return <div style={{ color: '#888' }}>No data</div>;
+
+                        // Calculate current vs previous period totals
+                        const currentTotal = monthCounts.reduce((a, b) => a + b, 0);
+                        let prevTotal = 0;
+                        let percentChange = 0;
+                        
+                        if (bookingsTimeframe !== 'custom') {
+                          // Calculate previous period
+                          const prevMonths = [];
+                          let prevStart, prevEnd;
+                          
+                          if (bookingsTimeframe === 'this_month') {
+                            const prevMonth = new Date(months[0].getFullYear(), months[0].getMonth() - 1, 1);
+                            prevStart = prevMonth;
+                            prevEnd = new Date(prevMonth.getFullYear(), prevMonth.getMonth() + 1, 1);
+                          } else if (bookingsTimeframe === 'last_3') {
+                            prevStart = new Date(months[0].getFullYear(), months[0].getMonth() - 3, 1);
+                            prevEnd = months[0];
+                          } else if (bookingsTimeframe === 'last_6') {
+                            prevStart = new Date(months[0].getFullYear(), months[0].getMonth() - 6, 1);
+                            prevEnd = months[0];
+                          }
+                          
+                          if (prevStart && prevEnd) {
+                            for (const b of bookings) {
+                              const d = resolveDate(b);
+                              if (!d) continue;
+                              if (d >= prevStart && d < prevEnd) prevTotal++;
+                            }
+                            percentChange = prevTotal === 0 ? (currentTotal > 0 ? 100 : 0) : ((currentTotal - prevTotal) / prevTotal) * 100;
+                          }
+                        }
+
+                        // Render as a simple bar chart (single bar per month, not stacked)
+                        const max = Math.max(...monthCounts, 1);
+                        const chartHeight = 160;
+                        const changeColor = percentChange > 0 ? '#10b981' : percentChange < 0 ? '#ef4444' : '#999';
+                        const changeSymbol = percentChange > 0 ? '↑' : percentChange < 0 ? '↓' : '→';
+                        
+                        return (
+                          <div>
+                            {/* Percentage change indicator */}
+                            {bookingsTimeframe !== 'custom' && (
+                              <div style={{ marginBottom: 12, padding: 8, background: '#f0f9ff', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span style={{ fontSize: 13, color: '#333' }}>vs previous period:</span>
+                                <span style={{ fontSize: 14, fontWeight: 600, color: changeColor }}>
+                                  {changeSymbol} {Math.abs(percentChange).toFixed(1)}%
+                                </span>
+                                <span style={{ fontSize: 12, color: '#666' }}>({prevTotal} → {currentTotal})</span>
+                              </div>
+                            )}
+                            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', height: chartHeight }}>
+                              {monthCounts.map((count, mi) => (
+                                <div key={mi} style={{ width: 56, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                  {Number(count) > 0 ? (
+                                    <div
+                                      role="img"
+                                      aria-label={`Total ${count} for ${monthLabels[mi]}`}
+                                      title={`${count} total`}
+                                      style={{ fontSize: 12, color: '#333', marginBottom: 6 }}
+                                    >
+                                      {abbreviateNumber(count)}
+                                    </div>
+                                  ) : (
+                                    <div style={{ height: 18 }} />
+                                  )}
+                                  <div
+                                    role="img"
+                                    aria-label={`${monthLabels[mi]} total ${count} bookings`}
+                                    style={{ height: chartHeight, width: 40, borderRadius: 6, background: '#4f46e5', boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.03)', position: 'relative' }}
+                                  >
+                                    <div style={{ height: Math.round((count / max) * chartHeight), width: '100%', background: '#4f46e5', borderRadius: 6, position: 'absolute', bottom: 0 }} />
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                            <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+                              {monthLabels.map((m, i) => (
+                                <div key={i} style={{ width: 56, textAlign: 'center', fontSize: 12, color: '#333' }}>{m.split(' ')[0]}</div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })()
+                    }
+                  </div>
                 </div>
               </div>
             </div>
