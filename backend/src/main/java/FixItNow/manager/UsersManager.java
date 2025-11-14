@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 
 import FixItNow.model.*;
 import FixItNow.repository.*;
+import jakarta.transaction.Transactional;
 
 
 @Service
@@ -111,4 +112,14 @@ public class UsersManager {
 		        ur.save(user);
 		    }
 		}
+	 
+	// inside UsersManager.java (or your manager class)
+	 @Transactional
+	 public boolean updatePasswordByEmail(String email, String newPassword) {
+	     Users u = getUserByEmail(email);
+	     if (u == null) return false;
+	     u.setPassword(newPassword);
+	     ur.save(u);
+	     return true;
+	 }
 }

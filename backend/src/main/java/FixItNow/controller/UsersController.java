@@ -466,6 +466,53 @@ public class UsersController {
         }
         return ResponseEntity.ok(responseList);
     }
+    
+    
+    @PostMapping("/forgot/check")
+    public ResponseEntity<?> checkEmailExists(@RequestBody Map<String, String> body) {
+        try {
+            String email = body.get("email");
+            if (email == null || email.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("message", "email is required"));
+            }
+            Users user = usersManager.getUserByEmail(email.trim().toLowerCase());
+            if (user == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "User not found"));
+            // Optionally return minimal user info or just 200
+            return ResponseEntity.ok(Map.of("exists", true, "id", user.getId()));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("message", "Failed to check email"));
+        }
+    }
+
+    // PUT /users/forgot/reset
+    @PutMapping("/forgot/reset")
+    public ResponseEntity<?> resetPassword(@RequestBody Map<String, String> body) {
+        try {
+            String email = body.get("email");
+            String newPassword = body.get("newPassword");
+            if (email == null || email.trim().isEmpty() || newPassword == null || newPassword.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("message", "email and newPassword are required"));
+            }
+            if (newPassword.length() < 6) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Password must be at least 6 characters"));
+            }
+
+            Users user = usersManager.getUserByEmail(email.trim().toLowerCase());
+            if (user == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "User not found"));
+            }
+
+            // NOTE: In production you should hash passwords before storing.
+            user.setPassword(newPassword);
+            usersRepository.save(user);
+
+            return ResponseEntity.ok(Map.of("message", "Password updated"));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("message", "Failed to reset password"));
+        }
+    }
  
   
 }
