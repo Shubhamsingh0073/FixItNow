@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FaMapMarkerAlt, FaSearch, FaTools, FaStar, FaPhone, FaEnvelope, FaExclamationTriangle, FaUser, FaHome, FaCalendarAlt, FaUserCircle, FaSignOutAlt, FaQuestionCircle, FaRegComments, FaRegThumbsUp, FaEdit, FaTimes, FaCheck, FaToolbox, FaClock } from 'react-icons/fa';
+import { FaMapMarkerAlt, FaSearch, FaTools, FaStar, FaPhone, FaEnvelope, FaExclamationTriangle, FaUser, FaHome, FaCalendarAlt, FaUserCircle, FaSignOutAlt, FaQuestionCircle, FaRegComments, FaRegThumbsUp, FaEdit, FaTimes, FaCheck, FaToolbox, FaClock, FaMoneyBillWave } from 'react-icons/fa';
 import './CustomerDashboard.css';
 import ProviderModal from "./ProviderModal";
 import ChatPanel from "./ChatPanel";
@@ -60,11 +60,17 @@ const CustomerDashboard = () => {
 
   const [modalBooking, setModalBooking] = useState(null);
 
+  const [myReports, setMyReports] = useState([]);
+  const [loadingReports, setLoadingReports] = useState(false);
+  const [reportsError, setReportsError] = useState(null);
+
 
   const [showReportForm, setShowReportForm] = useState(false);
-  const [reportProviderId, setReportProviderId] = useState('');
   const [reportText, setReportText] = useState('');
   const [reportSubmitting, setReportSubmitting] = useState(false);
+
+  const [reportBookingId, setReportBookingId] = useState('');
+  const [refundBookingId, setRefundBookingId] = useState('');
 
   const [modalScrollTop, setModalScrollTop] = useState(0);
   const [selectedServices, setSelectedServices] = useState({});
@@ -216,6 +222,71 @@ const CustomerDashboard = () => {
   }, []);
 
 
+
+  const getProviderNameById = (id) => {
+    if (!id) return id;
+    const p = (serviceProviders || []).find(s =>
+      String(s.id) === String(id) ||
+      String(s.provider?.id) === String(id) ||
+      String(s.providerId) === String(id)
+    );
+    if (!p) return id;
+    return p.provider?.name || p.name || p.category || id;
+  };
+
+  // Fetch reports for the logged-in customer
+  useEffect(() => {
+    const loadMyReports = async () => {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setReportsError('Not authenticated');
+        return;
+      }
+
+      setLoadingReports(true);
+      setReportsError(null);
+
+      try {
+        const res = await fetch('http://localhost:8087/api/reports/customer', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (!res.ok) {
+          const text = await res.text().catch(() => '');
+          throw new Error(`${res.status} ${text || res.statusText}`);
+        }
+
+        const data = await res.json();
+        setMyReports(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error('Failed to load reports', err);
+        setReportsError(err.message || 'Failed to load reports');
+        setMyReports([]);
+      } finally {
+        setLoadingReports(false);
+      }
+    };
+
+    loadMyReports();
+  }, [serviceProviders]);
+
+
+
+  const reportsOnly = React.useMemo(() => {
+    if (!Array.isArray(myReports)) return [];
+    return myReports.filter(r => String(r.category || '').trim().toUpperCase() === 'REPORT');
+  }, [myReports]);
+
+  const refundsOnly = React.useMemo(() => {
+    if (!Array.isArray(myReports)) return [];
+    return myReports.filter(r => String(r.category || '').trim().toUpperCase() === 'REFUND');
+  }, [myReports]);
+
+
   // Chat-specific state for customers
   const [conversations, setConversations] = useState([]); // { peerId, peerName, lastMessage }
   const [selectedPeer, setSelectedPeer] = useState(null);
@@ -238,60 +309,96 @@ const CustomerDashboard = () => {
     return matchesCategory && matchesSearch;
   });
   
-  const bookedProviderIds = new Set(
-    customerBookings
-      .filter(b => b.status) // status is assigned
-      .map(b => b.providerId) // assuming booking has providerId
-  );
-  
-  const homeProviders = filteredProviders.filter(
-    p => !bookedProviderIds.has(p.id)
+  // consider these statuses as "active" bookings that should hide a provider
+  const ACTIVE_BOOKING_STATUSES = new Set([
+    'PENDING',
+    'CONFIRMED',
+    'IN_PROGRESS',
+  ]);
+
+  // provider ids that currently have an active booking (case-insensitive)
+  const activeBookedProviderIds = new Set(
+    (customerBookings || [])
+      .filter(b => {
+        if (!b || !b.status) return false;
+        const s = String(b.status).trim().toUpperCase();
+        return ACTIVE_BOOKING_STATUSES.has(s);
+      })
+      .map(b => String(b.providerId))
   );
 
-
-  const reportOptions = React.useMemo(() => {
-  // gather providerIds from customerBookings (bookings has providerId)
-  const providerIds = Array.from(new Set((customerBookings || []).map(b => b.providerId).filter(Boolean)));
-  // map to provider objects (look up from serviceProviders by id)
-  return providerIds.map(pid => {
-    const prov = serviceProviders.find(s => String(s.id) === String(pid) || (s.provider && String(s.provider.id) === String(pid)));
-    const name = prov?.provider?.name || prov?.name || prov?.category || pid;
-    const createdOn = prov?.provider?.createdOn || prov?.createdOn || '';
-    return { id: pid, name, createdOn };
+  // homeProviders: show providers that do NOT have an active booking
+  const homeProviders = filteredProviders.filter(p => {
+    const pid = String(p.id ?? '');
+    return !activeBookedProviderIds.has(pid);
   });
-}, [customerBookings, serviceProviders]);
+  
 
-  // Handler to submit report
-  const handleReportSubmit = async () => {
-    // reporter id: prefer the userData object if you have it, otherwise fallback to localStorage
+  const reportBookingOptions = React.useMemo(() => {
+    if (!Array.isArray(customerBookings)) return [];
+    return customerBookings.map(b => {
+      // b expected shape: { bookingId, providerId, bookingDate, status, ... }
+      const providerName = getProviderNameById(b.providerId);
+      const formattedDate = b.bookingDate ? (new Date(b.bookingDate)).toLocaleString() : '';
+      const label = `${providerName}${formattedDate ? ` — ${formattedDate}` : ''}`;
+      return {
+        bookingId: b.bookingId ?? b.id ?? '',
+        providerId: b.providerId,
+        label,
+        status: b.status
+      };
+    }).filter(opt => opt.bookingId); // keep only valid booking ids
+  }, [customerBookings, serviceProviders]);
+
+   // Refund options
+  const [showRefundForm, setShowRefundForm] = useState(false);
+
+  // refundOptions: only providers from bookings where booking.status === 'CANCELLED'
+  const refundBookingOptions = React.useMemo(() => {
+    return reportBookingOptions.filter(opt => String(opt.status || '').trim().toLowerCase() === 'cancelled');
+  }, [reportBookingOptions]);
+
+  // Unified submit: category should be "REPORT" or "REFUND".
+  const handleSubmitReportOrRefund = async (category = "REPORT", bookingIdArg = null) => {
+    const bookingId = bookingIdArg ?? reportBookingId;
     const reporterId = (userData && userData.id) || localStorage.getItem('userId');
+
     if (!reporterId) {
-      alert('You are not logged in. Please login to submit a report.');
+      alert('You are not logged in. Please login to submit.');
       return;
     }
-
-    if (!reportProviderId) {
-      alert('Please select a provider to report.');
+    if (!bookingId) {
+      alert('Please select a booking from the dropdown.');
       return;
     }
-
     if (!reportText || !reportText.trim()) {
-      alert('Please enter a complaint before submitting.');
+      alert('Please enter your complaint/reason before submitting.');
+      return;
+    }
+
+    // Find the booking in local state to get providerId (defensive)
+    const booking = (customerBookings || []).find(b => String(b.bookingId ?? b.id) === String(bookingId));
+    const reportedOnId = booking?.providerId ?? booking?.provider?.id ?? null;
+    if (!reportedOnId) {
+      // fallback: some option records include providerId in the option list
+      const optFromList = reportBookingOptions.find(o => String(o.bookingId) === String(bookingId));
+      if (optFromList) reportedOnId = optFromList.providerId;
+    }
+    if (!reportedOnId) {
+      alert('Could not determine provider for selected booking. Please try again.');
       return;
     }
 
     setReportSubmitting(true);
-
     try {
-      // Use full backend URL if you don't have a proxy; otherwise you can use '/api/reports'
-      const url = 'http://localhost:8087/api/reports';
-
-      const token = localStorage.getItem('token'); // include JWT if backend requires auth
-
+      const url = 'http://localhost:8087/api/reports'; 
+      const token = localStorage.getItem('token');
       const payload = {
         reportedById: reporterId,
-        reportedOnId: reportProviderId,
-        reason: reportText.trim()
+        reportedOnId: reportedOnId,
+        reason: reportText.trim(),
+        category: String(category).toUpperCase(),   // "REPORT" or "REFUND"
+        bookingId: bookingId
       };
 
       const res = await fetch(url, {
@@ -305,34 +412,33 @@ const CustomerDashboard = () => {
 
       if (!res.ok) {
         const text = await res.text().catch(() => '');
-        console.error('Report submit failed', res.status, text);
-        // show helpful message to user
-        alert(`Failed to submit report: ${res.status} ${text || res.statusText}`);
+        console.error('Submit failed', res.status, text);
+        alert(`Failed to submit: ${res.status} ${text || res.statusText}`);
         return;
       }
 
-      // server responds with created resource details (per your backend)
-      const data = await res.json().catch(() => null);
-      console.log('Report created:', data);
+      const resp = await res.json().catch(() => null);
+      console.log('Created report/refund:', resp);
 
-      // Success UX: clear form, close panel, show confirmation
+      // Reset form fields
       setReportText('');
-      setReportProviderId('');
-      setShowReportForm(false); // if you used a toggle to show the form
-      alert('Report submitted. Thank you.');
+      setReportBookingId('');
+      setRefundBookingId('');
+      setShowReportForm(false);
+      setShowRefundForm(false);
+      alert('Submitted successfully.');
 
-      // Optionally refresh any UI or fetch server-side complaints if you display them
     } catch (err) {
-      console.error('Network error submitting report', err);
-      alert('Network error while submitting report. Please try again.');
+      console.error('Network error submitting:', err);
+      alert('Network error while submitting. Check console.');
     } finally {
       setReportSubmitting(false);
     }
   };
 
+
   
   // load conversations for customer when Chat tab active
-  // inside CustomerDashboard component (replace the existing conversations-loading useEffect)
   useEffect(() => {
     const ADMIN_PEER_ID = 'U10';
     const ADMIN_PEER_NAME = 'Admin';
@@ -387,26 +493,7 @@ const CustomerDashboard = () => {
             dedup.push(c);
           }
         }
-
         setConversations(dedup);
-
-        // OPTIONAL: If you want the server to create the conversation record for admin (so history endpoints return a conversation id),
-        // you can POST to the server when no admin conv exists. Uncomment the block below if you have a backend endpoint
-        // to create/initiate a conversation (adjust URL to your API).
-        /*
-        if (!hasAdmin) {
-          try {
-            await fetch('http://localhost:8087/api/chat/conversations', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-              body: JSON.stringify({ participants: [customerId, ADMIN_PEER_ID], initiatedBy: customerId })
-            });
-            // no need to re-fetch immediately; polling will pick it up next tick/interval
-          } catch (err) {
-            console.warn('Failed to create admin conversation on server', err);
-          }
-        }
-        */
 
       } catch (err) {
         console.error('Failed loading conversations', err);
@@ -789,7 +876,7 @@ const handleConnect = (provider, bookingDate, selectedServicesFromModal, selecte
         {activePage === 'Chat' && (
           <div className="chat-page">
             <div className="chat-sidebar">
-              <h3>Conversations</h3>
+              <h3>Messages</h3>
               {loadingConversations ? (
                 <div style={{ color: '#666' }}>Loading...</div>
               ) : (
@@ -954,65 +1041,239 @@ const handleConnect = (provider, bookingDate, selectedServicesFromModal, selecte
                 <FaQuestionCircle className="profile-action-icon" /> Help
               </button>
               <div className="report-container">
-              <button
-                className="profile-wide-action-btn"
-                onClick={() => setShowReportForm(prev => !prev)}
-                aria-expanded={showReportForm}
-                aria-controls="customer-report-form"
-              >
-                <FaExclamationTriangle className="profile-action-icon" /> Report
-              </button>
+                <button
+                  className="profile-wide-action-btn"
+                  onClick={() => setShowReportForm(prev => !prev)}
+                >
+                  <FaExclamationTriangle className="profile-action-icon" /> Report
+                </button>
 
-              {showReportForm && (
-                <div id="customer-report-form" className="report-form">
-                  <label className="report-field">
-                    <div className="report-label">Select provider</div>
-                    <select
-                      value={reportProviderId}
-                      onChange={(e) => setReportProviderId(e.target.value)}
-                    >
-                      <option value="">-- select provider --</option>
-                      {reportOptions.length === 0 ? (
-                        <option value="" disabled>No providers booked yet</option>
+                {showReportForm && (
+                  <div id="customer-report-form" className="report-form">
+                    {/* Report form */}
+                    <label className="report-field">
+                      <div className="report-label">Select booking</div>
+                      <select
+                        value={reportBookingId}
+                        onChange={(e) => setReportBookingId(e.target.value)}
+                      >
+                        <option value="">-- select booking --</option>
+                        {reportBookingOptions.length === 0 ? (
+                          <option value="" disabled>No bookings found</option>
+                        ) : (
+                          reportBookingOptions.map(opt => (
+                            <option key={opt.bookingId} value={opt.bookingId}>
+                              {opt.label}
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    </label>
+
+                    <label className="report-field">
+                      <div className="report-label">Complaint</div>
+                      <textarea
+                        rows={4}
+                        value={reportText}
+                        onChange={(e) => setReportText(e.target.value)}
+                        placeholder="Describe your complaint..."
+                      />
+                    </label>
+
+                    <div className="report-actions">
+                      <button
+                        className="report-submit-btn"
+                        onClick={() => handleSubmitReportOrRefund('REPORT')}
+                        disabled={reportSubmitting || !reportBookingId || !reportText.trim()}
+                      >
+                        {reportSubmitting ? 'Submitting…' : 'Submit'}
+                      </button>
+                      <button
+                        className="report-cancel-btn"
+                        onClick={() => { setShowReportForm(false); setReportText(''); setReportBookingId(''); }}
+                        disabled={reportSubmitting}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+
+                    
+                    <div className="profile-reports-box" style={{ marginTop: 18 }}>
+                      <h3 style={{ marginBottom: 10 }}>My Reports</h3>
+
+                      {loadingReports ? (
+                        <div style={{ color: '#666' }}>Loading your reports…</div>
+                      ) : reportsError ? (
+                        <div style={{ color: 'red' }}>Error: {reportsError}</div>
+                      ) : reportsOnly.length === 0 ? (
+                        <div style={{ color: '#666' }}>You have not submitted any reports.</div>
                       ) : (
-                        reportOptions.map(opt => (
-                          <option key={opt.id} value={opt.id}>
-                            {opt.name}{opt.createdOn ? ` — ${opt.createdOn}` : ''}
-                          </option>
-                        ))
+                        <div style={{ display: 'grid', gap: 12 }}>
+                          {reportsOnly.map((r) => (
+                            <div key={r.id ?? `${r.reportedOnId}-${r.createdAt}`} className="report-card">
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
+                                <div style={{ fontWeight: 700 }}>
+                                  {getProviderNameById(r.reportedOnId)}{r.bookingId ? ` — ${r.bookingId}` : ''}
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                  <div style={{ color: '#666', fontSize: 12 }}>{r.createdAt ? new Date(r.createdAt).toLocaleString() : ''}</div>
+                                  <div className={`report-status ${String(r.status || '').toLowerCase()}`}>{r.status}</div>
+                                </div>
+                              </div>
+                              {/* Reason text */}
+                              <div style={{ marginTop: 8, color: '#222' }}>
+                                {r.reason}
+                              </div>
+
+                              {/* Admin reply (if any). Checks several common property names */}
+                              {(r.reply || r.adminReply || r.response || r.admin_reply) && (
+                                <div className="admin-reply">
+                                  <div className="admin-reply-label">Admin reply</div>
+                                  <div className="admin-reply-text">
+                                    {r.reply ?? r.adminReply ?? r.response ?? r.admin_reply}
+                                  </div>
+
+                                  {/* optional reply timestamp if backend provides one */}
+                                  {(r.replyAt || r.repliedAt || r.replied_at) && (
+                                    <div className="admin-reply-time">
+                                      {new Date(r.replyAt ?? r.repliedAt ?? r.replied_at).toLocaleString()}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Report / Refund id */}
+                              <div style={{ marginTop: 8, fontSize: 12, color: '#666' }}>
+                                Report ID: {r.id}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       )}
-                    </select>
-                  </label>
+                    </div> 
+                  </div>   
+                )}
+            
+              </div>
+              {/* Refund Request button and form */}
+              <div style={{ display: 'inline-block', marginLeft: 8 }}>
+                <button
+                  className="profile-wide-action-btn"
+                  onClick={() => setShowRefundForm(prev => !prev)}                  
+                >
+                  <FaMoneyBillWave className="profile-action-icon" /> Refund Request
+                </button>
 
-                  <label className="report-field">
-                    <div className="report-label">Complaint</div>
-                    <textarea
-                      rows={4}
-                      value={reportText}
-                      onChange={(e) => setReportText(e.target.value)}
-                      placeholder="Describe your complaint..."
-                    />
-                  </label>
+                {showRefundForm && (
+                  <div id="customer-report-form" className="report-form">
+                    {/* Refund form */}
+                    <label className="report-field">
+                      <div className="report-label">Select cancelled booking</div>
+                      <select
+                        value={refundBookingId}
+                        onChange={(e) => setRefundBookingId(e.target.value)}
+                      >
+                        <option value="">-- select booking --</option>
+                        {refundBookingOptions.length === 0 ? (
+                          <option value="" disabled>No bookings</option>
+                        ) : (
+                          refundBookingOptions.map(opt => (
+                            <option key={opt.bookingId} value={opt.bookingId}>
+                              {opt.label}
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    </label>
 
-                  <div className="report-actions">
-                    <button
-                      className="report-submit-btn"
-                      onClick={handleReportSubmit}
-                      disabled={reportSubmitting || !reportProviderId || !reportText.trim()}
-                    >
-                      {reportSubmitting ? 'Submitting…' : 'Submit'}
-                    </button>
-                    <button
-                      className="report-cancel-btn"
-                      onClick={() => { setShowReportForm(false); setReportText(''); setReportProviderId(''); }}
-                      disabled={reportSubmitting}
-                    >
-                      Cancel
-                    </button>
+                    <label className="report-field">
+                      <div className="report-label">Reason for Refund</div>
+                      <textarea
+                        rows={4}
+                        value={reportText}
+                        onChange={(e) => setReportText(e.target.value)}
+                        placeholder="Describe your reason..."
+                      />
+                    </label>
+
+                    <div className="report-actions">
+                      <button
+                        className="report-submit-btn"
+                        onClick={() => handleSubmitReportOrRefund('REFUND', refundBookingId)}
+                        disabled={reportSubmitting || !refundBookingId || !reportText.trim()}
+                      >
+                        {reportSubmitting ? 'Submitting…' : 'Submit'}
+                      </button>
+                      <button
+                        className="report-cancel-btn"
+                        onClick={() => {
+                          setShowRefundForm(false);
+                          setRefundBookingId('');
+                        }}
+                        disabled={reportSubmitting}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+
+                    <div className="profile-reports-box" style={{ marginTop: 18 }}>
+                      <h3 style={{ marginBottom: 10 }}>My Refund Requests</h3>
+
+                      {loadingReports ? (
+                        <div style={{ color: '#666' }}>Loading your requests…</div>
+                      ) : reportsError ? (
+                        <div style={{ color: 'red' }}>Error: {reportsError}</div>
+                      ) : refundsOnly.length === 0 ? (
+                        <div style={{ color: '#666' }}>You have not submitted any refund requests.</div>
+                      ) : (
+                        <div style={{ display: 'grid', gap: 12 }}>
+                          {refundsOnly.map((r) => (
+                            <div key={r.id ?? `${r.reportedOnId}-${r.createdAt}`} className="report-card">
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
+                                <div style={{ fontWeight: 700 }}>
+                                  {getProviderNameById(r.reportedOnId)}{r.bookingId ? ` — ${r.bookingId}` : ''}
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                  <div style={{ color: '#666', fontSize: 12 }}>{r.createdAt ? new Date(r.createdAt).toLocaleString() : ''}</div>
+                                  <div className={`report-status ${String(r.status || '').toLowerCase()}`}>{r.status}</div>
+                                </div>
+                              </div>
+                              {/* Reason text */}
+                              <div style={{ marginTop: 8, color: '#222' }}>
+                                {r.reason}
+                              </div>
+
+                              {/* Admin reply (if any). Checks several common property names */}
+                              {(r.reply || r.adminReply || r.response || r.admin_reply) && (
+                                <div className="admin-reply">
+                                  <div className="admin-reply-label">Admin reply</div>
+                                  <div className="admin-reply-text">
+                                    {r.reply ?? r.adminReply ?? r.response ?? r.admin_reply}
+                                  </div>
+
+                                  {/* optional reply timestamp if backend provides one */}
+                                  {(r.replyAt || r.repliedAt || r.replied_at) && (
+                                    <div className="admin-reply-time">
+                                      {new Date(r.replyAt ?? r.repliedAt ?? r.replied_at).toLocaleString()}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Report / Refund id */}
+                              <div style={{ marginTop: 8, fontSize: 12, color: '#666' }}>
+                                Report ID: {r.id}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div> 
+
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+              
               <button className="profile-wide-action-btn">
                 <FaRegComments className="profile-action-icon" /> FAQ
               </button>

@@ -745,7 +745,7 @@ useEffect(() => {
         {activePage === 'Chat' && (
           <div className="chat-page">
             <div className="chat-sidebar">
-              <h3>Conversations</h3>
+              <h3>Messages</h3>
               {loadingConversations ? (
                 <div style={{ color: '#666' }}>Loading...</div>
               ) : (

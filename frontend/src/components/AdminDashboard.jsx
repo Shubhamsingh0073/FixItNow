@@ -8,6 +8,7 @@ import {
 import "./AdminDashboard.css";
 import Reviews from "./Reviews";
 import ChatPanel from "./ChatPanel";
+import AdminCharts from "./AdminCharts";
 
 const userExamples = [
   { name: "Suresh Kumar", email: "suresh.k@example.com", role: "Customer" },
@@ -141,19 +142,26 @@ const AdminDashboard = () => {
     setUsers(merged);
   }, [customers, providers]);
 
-  useEffect(() => {
-    const fetchReports = async () => {
-      try {
-        const response = await fetch("http://localhost:8087/api/reports");
-        if (!response.ok) throw new Error("Failed to fetch reports");
-        const data = await response.json();
-        setReports(data);
-      } catch (error) {
-        console.error("Error fetching reports:", error);
-        setReports([]);
+  const loadReports = async () => {
+    try {
+      const res = await fetch("http://localhost:8087/api/reports", {
+        headers: { "Content-Type": "application/json" }
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(`Failed to fetch reports: ${res.status} ${text}`);
       }
-    };
-    fetchReports();
+      const data = await res.json();
+      setReports(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Error fetching reports:", err);
+      // keep whatever we have in state rather than wiping it aggressively
+    }
+  };
+
+  // call once on mount
+  useEffect(() => {
+    loadReports().catch(err => { /* already logged in loadReports */ });
   }, []);
 
   useEffect(() => {
@@ -272,15 +280,9 @@ const AdminDashboard = () => {
     }
   }, [activeTab, adminUser]);
 
-
-
-  // Safe provider id getter (works with various shapes)
   const getProviderId = (p) =>
     p == null ? null : (p.id ?? p._id ?? p.providerId ?? p.provider?.id ?? null);
 
-
-  // Replace your existing updateProviderVerification with this function
-  // helper to resolve an id for a providers list item (service or nested provider)
   const resolveServiceId = (item) => {
     return (
       item?.id ??
@@ -333,19 +335,16 @@ const AdminDashboard = () => {
         returned = null;
       }
 
-      // Update providers state by id (merge returned fields with existing item to preserve nested data)
       setProviders(prev => {
         return prev.map(item => {
           const itemId = resolveServiceId(item);
           if (String(itemId) !== String(serviceId)) return item;
 
-          // If server returned an updated object, merge it with the old item (prefer server-provided values)
           if (returned && typeof returned === "object") {
             const merged = {
-              ...item,               // start with current item
-              ...returned,           // overwrite with server-returned top-level fields
+              ...item,               
+              ...returned,           
               provider: {
-                // nested provider: prefer returned.provider, else keep item.provider
                 ...(item.provider || {}),
                 ...(returned.provider || {}),
               },
@@ -353,14 +352,11 @@ const AdminDashboard = () => {
             return merged;
           }
 
-          // No returned body -> optimistic update: keep everything but update verified
           return { ...item, verified: newStatus };
         });
       });
 
       console.log("updateProviderVerification: success", serviceId, newStatus);
-      // Optionally re-fetch providers to be 100% in sync with server:
-      // await fetchProviders(); // implement fetchProviders() or call existing loader
     } catch (err) {
       console.error("Error updating provider verification:", err);
       alert("Network error while updating provider verification. See console.");
@@ -368,6 +364,123 @@ const AdminDashboard = () => {
       setProcessingServiceId(null);
     }
   };
+
+  const [actionModalOpen, setActionModalOpen] = useState(false);
+  const [actionTarget, setActionTarget] = useState(null); 
+  const [actionType, setActionType] = useState(null); 
+  const [actionReply, setActionReply] = useState('');
+  const [actionReadOnly, setActionReadOnly] = useState(false); 
+  const [processingReportId, setProcessingReportId] = useState(null); 
+
+  const [manageReports, setManageReports] = useState(false);
+  const [manageRefunds, setManageRefunds] = useState(false);
+
+
+  // filtered lists for report and refund tables
+  const reportsOnly = useMemo(() => {
+    if (!Array.isArray(reports)) return [];
+    return reports.filter(r => String(r.category || '').trim().toUpperCase() === 'REPORT');
+  }, [reports]);
+
+  const refundsOnly = useMemo(() => {
+    if (!Array.isArray(reports)) return [];
+    return reports.filter(r => String(r.category || '').trim().toUpperCase() === 'REFUND');
+  }, [reports]);
+
+
+  const openActionModal = (reportObj, type) => {
+    // type is 'accept' or 'reject'
+    setActionTarget(reportObj);
+    setActionType(type);
+
+    // For refunds, if admin clicks "approved" prefill the reply with the refund message and optionally make it readonly
+    const category = String(reportObj?.category || '').toUpperCase();
+    if (category === 'REFUND' && type === 'approved') {
+      setActionReply('Refund has been initiated');
+      setActionReadOnly(true); // make readonly so admin doesn't accidentally change; set false if you want editable
+    } else {
+      // default: empty reply for admin to type
+      setActionReply('');
+      setActionReadOnly(false);
+    }
+
+    setActionModalOpen(true);
+  };
+
+  const closeActionModal = () => {
+    setActionModalOpen(false);
+    setActionTarget(null);
+    setActionType(null);
+    setActionReply('');
+    setActionReadOnly(false);
+  };
+
+  // Submit admin response: sets status and sends reply to backend
+  const submitActionResponse = async () => {
+    if (!actionTarget || !actionType) return;
+    const newStatus = actionType === 'approved' ? 'APPROVED' : 'REJECTED';
+    const reportId = actionTarget.id;
+    if (!reportId) {
+      alert('Report id not available.');
+      return;
+    }
+
+    setProcessingReportId(reportId);
+
+    // prepare payload
+    const payload = {
+      status: newStatus,
+      reply: actionReply || (newStatus === 'APPROVED' && actionTarget.category === 'REFUND' ? 'Refund has been initiated' : '')
+    };
+
+    try {
+      const token = localStorage.getItem('token');
+      const url = `http://localhost:8087/api/reports/${encodeURIComponent(reportId)}`;
+      const res = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        console.error('Failed updating report status', res.status, text);
+
+        // Temporary heuristic: if backend returns 500 with message indicating update succeeded,
+        // we can still optimistically update — optional.
+        // Otherwise show error and return.
+        alert(`Failed to update report: ${res.status} ${text || res.statusText}`);
+        return;
+      }
+
+      // Try parse updated object if server returned it
+      let updated = null;
+      try { updated = await res.json(); } catch (_) { updated = null; }
+
+      // Optimistically update local state immediately so UI changes without needing a reload
+      setReports(prev => prev.map(r => {
+        if (String(r.id) !== String(reportId)) return r;
+        if (updated && typeof updated === 'object') return updated;
+        return { ...r, status: newStatus, adminReply: payload.reply };
+      }));
+
+      // close modal right away to give snappy UX
+      closeActionModal();
+
+      // Refresh canonical data from server (ensures names/fields returned by server are applied)
+      await loadReports();
+
+    } catch (err) {
+      console.error('Error submitting admin response', err);
+      alert('Network error while responding. See console.');
+    } finally {
+      setProcessingReportId(null);
+    }
+  };
+
 
   // Build reviews map for quick stats
   const reviewsMap = useMemo(() => {
@@ -833,482 +946,12 @@ const AdminDashboard = () => {
               ))}
             </div>
 
-            <div className="tables">
-              <div className="table">
-                <h3>Users</h3>
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Name</th>
-                      <th>Email</th>
-                      <th>Role</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {users.slice(0, 4).map((u, i) => (
-                      <tr key={i}>
-                        <td>{u.name}</td>
-                        <td>{u.email}</td>
-                        <td>{u.role}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <div className="table">
-                <h3>Recent Bookings</h3>
-                <table>
-                  <thead>
-                    <tr>
-                      <th>ID</th>
-                      <th>User</th>
-                      <th>Service</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {bookings.map((b, i) => (
-                      <tr key={i}>
-                        <td>{b.id}</td>
-                        <td>{b.customer.name}</td>
-                        <td>{b.provider.name}</td>
-                        <td>
-                          <span className={`status ${b.status.replace(" ", "").toLowerCase()}`}>{b.status}</span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            
             {/* Charts: 2x2 Grid Layout */}
             <div style={{ marginTop: 20 }}>
-              <h3 style={{ marginBottom: 12 }}>Analytics</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16, position: 'relative' }}>
-                {/* Row 1, Col 1: Most booked services */}
-                <div style={{ background: '#fff', padding: 12, borderRadius: 8, boxShadow: '0 4px 18px rgba(0,0,0,0.04)', minHeight: 500 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ fontWeight: 700, marginBottom: 8 }}>Most booked services (month-wise)</div>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      <select value={serviceTimeframe} onChange={(e) => setServiceTimeframe(e.target.value)} style={{ padding: '6px 8px', fontSize: 13 }}>
-                        <option value="this_month">This month</option>
-                        <option value="last_3">Last 3 months</option>
-                        <option value="last_6">Last 6 months</option>
-                        <option value="custom">Select month</option>
-                      </select>
-                      {serviceTimeframe === 'custom' && (
-                      <input type="month" value={serviceCustomMonth} onChange={(e) => setServiceCustomMonth(e.target.value)} style={{ padding: '6px 8px', fontSize: 13 }} />
-                      )}
-                    </div>
-                  </div>
-                  <div style={{ marginTop: 8 }}>
-                    {
-                      (() => {
-                        const { months, monthLabels } = computeRange(serviceTimeframe, serviceCustomMonth);
-                        if (!months || months.length === 0) return <div style={{ color: '#888' }}>No data</div>;
-
-                        // build svcMap: service -> counts per month index
-                        const svcMap = {};
-                        const resolveDate = (b) => {
-                          if (!b) return null;
-                          const candidates = [b.createdAt, b.created_at, b.date, b.bookingDate, b.bookedAt, b.createdOn];
-                          for (const c of candidates) {
-                            if (!c) continue;
-                            const d = new Date(c);
-                            if (!isNaN(d)) return d;
-                          }
-                          if (typeof b === 'number' || (typeof b === 'string' && /^\d+$/.test(b))) {
-                            const d = new Date(Number(b));
-                            if (!isNaN(d)) return d;
-                          }
-                          return null;
-                        };
-
-                        for (const b of bookings) {
-                          const d = resolveDate(b);
-                          if (!d) continue;
-                          // within range
-                          if (d < months[0] || d >= new Date(months[months.length - 1].getFullYear(), months[months.length - 1].getMonth() + 1, 1)) continue;
-                          const svc = (b.service && (b.service.name || b.service.category)) || (b.serviceCategory) || (b.serviceName) || (b.bookedService) || 'Unknown';
-                          if (!svcMap[svc]) svcMap[svc] = Array(months.length).fill(0);
-                          for (let mi = 0; mi < months.length; mi++) {
-                            const sStart = months[mi];
-                            const sEnd = new Date(sStart.getFullYear(), sStart.getMonth() + 1, 1);
-                            if (d >= sStart && d < sEnd) {
-                              svcMap[svc][mi]++;
-                              break;
-                            }
-                          }
-                        }
-
-                        // determine top services by total across range
-                        const svcArr = Object.entries(svcMap).map(([label, values]) => ({ label, values, total: values.reduce((a, b) => a + b, 0) }));
-                        svcArr.sort((a, b) => b.total - a.total);
-                        const topServicesList = svcArr.slice(0, 6);
-                        if (topServicesList.length === 0) return <div style={{ color: '#888' }}>No data</div>;
-
-                        // Calculate % change: current period vs previous (for top 6 services)
-                        let currentServicesTotal = 0;
-                        let prevServicesTotal = 0;
-                        for (const s of topServicesList) {
-                          currentServicesTotal += s.total;
-                        }
-                        
-                        let percentChangeServices = 0;
-                        if (serviceTimeframe !== 'custom') {
-                          let prevStart, prevEnd;
-                          if (serviceTimeframe === 'this_month') {
-                            const prevMonth = new Date(months[0].getFullYear(), months[0].getMonth() - 1, 1);
-                            prevStart = prevMonth;
-                            prevEnd = new Date(prevMonth.getFullYear(), prevMonth.getMonth() + 1, 1);
-                          } else if (serviceTimeframe === 'last_3') {
-                            prevStart = new Date(months[0].getFullYear(), months[0].getMonth() - 3, 1);
-                            prevEnd = months[0];
-                          } else if (serviceTimeframe === 'last_6') {
-                            prevStart = new Date(months[0].getFullYear(), months[0].getMonth() - 6, 1);
-                            prevEnd = months[0];
-                          }
-                          
-                          if (prevStart && prevEnd) {
-                            // Count previous period bookings for same top 6 services
-                            const topServiceNames = new Set(topServicesList.map(s => s.label));
-                            for (const b of bookings) {
-                              const d = resolveDate(b);
-                              if (!d) continue;
-                              if (d >= prevStart && d < prevEnd) {
-                                const svc = (b.service && (b.service.name || b.service.category)) || (b.serviceCategory) || (b.serviceName) || (b.bookedService) || 'Unknown';
-                                if (topServiceNames.has(svc)) {
-                                  prevServicesTotal++;
-                                }
-                              }
-                            }
-                            percentChangeServices = prevServicesTotal === 0 ? (currentServicesTotal > 0 ? 100 : 0) : ((currentServicesTotal - prevServicesTotal) / prevServicesTotal) * 100;
-                          }
-                        }
-
-                        const services = topServicesList.map(s => s.label);
-                        const valuesByMonth = topServicesList[0].values.map((_, mi) => topServicesList.map(s => s.values[mi]));
-                        const colors = ['#4f46e5', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
-                        const changeColorSvc = percentChangeServices > 0 ? '#10b981' : percentChangeServices < 0 ? '#ef4444' : '#999';
-                        const changeSymbolSvc = percentChangeServices > 0 ? '↑' : percentChangeServices < 0 ? '↓' : '→';
-                        
-                        return (
-                          <div>
-                            {serviceTimeframe !== 'custom' && (
-                              <div style={{ marginBottom: 12, padding: 8, background: '#f0f9ff', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <span style={{ fontSize: 13, color: '#333' }}>vs previous:</span>
-                                <span style={{ fontSize: 14, fontWeight: 600, color: changeColorSvc }}>
-                                  {changeSymbolSvc} {Math.abs(percentChangeServices).toFixed(1)}%
-                                </span>
-                                <span style={{ fontSize: 12, color: '#666' }}>({prevServicesTotal} → {currentServicesTotal})</span>
-                              </div>
-                            )}
-                            <SmallMonthStackedBarChart services={services} monthLabels={monthLabels} valuesByMonth={valuesByMonth} colors={colors} />
-                          </div>
-                        );
-                      })()
-                    }
-                  </div>
-                </div>
-
-                {/* Row 1, Col 2: Top providers */}
-                <div style={{ background: '#fff', padding: 12, borderRadius: 8, boxShadow: '0 4px 18px rgba(0,0,0,0.04)', minHeight: 500 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ fontWeight: 700, marginBottom: 8 }}>Top providers (month-wise)</div>
-                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                        <select value={providerTimeframe} onChange={(e) => setProviderTimeframe(e.target.value)} style={{ padding: '6px 8px', fontSize: 13 }}>
-                          <option value="this_month">This month</option>
-                          <option value="last_3">Last 3 months</option>
-                          <option value="last_6">Last 6 months</option>
-                          <option value="custom">Select month</option>
-                        </select>
-                        {providerTimeframe === 'custom' && (
-                        <input type="month" value={providerCustomMonth} onChange={(e) => setProviderCustomMonth(e.target.value)} style={{ padding: '6px 8px', fontSize: 13 }} />
-                      )}
-                      </div>
-                    </div>
-                    <div style={{ marginTop: 8 }}>
-                      {
-                        (() => {
-                            const { months, monthLabels } = computeRange(providerTimeframe, providerCustomMonth);
-                          if (!months || months.length === 0) return <div style={{ color: '#888' }}>No data</div>;
-
-                          const provMap = {};
-                          const resolveDate = (b) => {
-                            if (!b) return null;
-                            const candidates = [b.createdAt, b.created_at, b.date, b.bookingDate, b.bookedAt, b.createdOn];
-                            for (const c of candidates) {
-                              if (!c) continue;
-                              const d = new Date(c);
-                              if (!isNaN(d)) return d;
-                            }
-                            if (typeof b === 'number' || (typeof b === 'string' && /^\d+$/.test(b))) {
-                              const d = new Date(Number(b));
-                              if (!isNaN(d)) return d;
-                            }
-                            return null;
-                          };
-
-                          const resolveProviderName = (b) => {
-                            if (!b) return 'Unknown';
-                            const p = b.provider;
-                            const candidates = [
-                              p?.name,
-                              p?.fullName,
-                              p?.providerName,
-                              p?.displayName,
-                              p?.username,
-                              p?.user?.name,
-                              b.providerName,
-                              b.provider_name,
-                            ];
-                            for (const c of candidates) {
-                              if (c) return String(c);
-                            }
-                            if (typeof p === 'string' || typeof p === 'number') return String(p);
-                            if (b.providerId || b.provider_id) return String(b.providerId || b.provider_id);
-                            return 'Unknown';
-                          };
-
-                          for (const b of bookings) {
-                            const d = resolveDate(b);
-                            if (!d) continue;
-                            if (d < months[0] || d >= new Date(months[months.length - 1].getFullYear(), months[months.length - 1].getMonth() + 1, 1)) continue;
-                            const pname = resolveProviderName(b) || 'Unknown';
-                            if (!provMap[pname]) provMap[pname] = Array(months.length).fill(0);
-                            for (let mi = 0; mi < months.length; mi++) {
-                              const sStart = months[mi];
-                              const sEnd = new Date(sStart.getFullYear(), sStart.getMonth() + 1, 1);
-                              if (d >= sStart && d < sEnd) {
-                                provMap[pname][mi]++;
-                                break;
-                              }
-                            }
-                          }
-
-                          const provArr = Object.entries(provMap).map(([label, values]) => ({ label, values, total: values.reduce((a, b) => a + b, 0) }));
-                          provArr.sort((a, b) => b.total - a.total);
-                          const topProv = provArr.slice(0, 6);
-                          if (topProv.length === 0) return <div style={{ color: '#888' }}>No data</div>;
-
-                          // Calculate % change: current period vs previous (for top 6 providers)
-                          let currentProvidersTotal = 0;
-                          let prevProvidersTotal = 0;
-                          for (const p of topProv) {
-                            currentProvidersTotal += p.total;
-                          }
-                          
-                          let percentChangeProviders = 0;
-                          if (providerTimeframe !== 'custom') {
-                            let prevStart, prevEnd;
-                            if (providerTimeframe === 'this_month') {
-                              const prevMonth = new Date(months[0].getFullYear(), months[0].getMonth() - 1, 1);
-                              prevStart = prevMonth;
-                              prevEnd = new Date(prevMonth.getFullYear(), prevMonth.getMonth() + 1, 1);
-                            } else if (providerTimeframe === 'last_3') {
-                              prevStart = new Date(months[0].getFullYear(), months[0].getMonth() - 3, 1);
-                              prevEnd = months[0];
-                            } else if (providerTimeframe === 'last_6') {
-                              prevStart = new Date(months[0].getFullYear(), months[0].getMonth() - 6, 1);
-                              prevEnd = months[0];
-                            }
-                            
-                            if (prevStart && prevEnd) {
-                              // Count previous period bookings for same top 6 providers
-                              const topProviderNames = new Set(topProv.map(p => p.label));
-                              for (const b of bookings) {
-                                const d = resolveDate(b);
-                                if (!d) continue;
-                                if (d >= prevStart && d < prevEnd) {
-                                  const pname = (b.provider && (b.provider.name || b.provider.fullName)) || (b.providerName) || 'Unknown';
-                                  if (topProviderNames.has(pname)) {
-                                    prevProvidersTotal++;
-                                  }
-                                }
-                              }
-                              percentChangeProviders = prevProvidersTotal === 0 ? (currentProvidersTotal > 0 ? 100 : 0) : ((currentProvidersTotal - prevProvidersTotal) / prevProvidersTotal) * 100;
-                            }
-                          }
-
-                          const providersLabels = topProv.map(p => p.label);
-                          const valuesByMonth = topProv[0].values.map((_, mi) => topProv.map(p => p.values[mi]));
-                          const colors = ['#2b6cb0', '#2a4365', '#2c5282', '#2f855a', '#234e52', '#1e3a8a'];
-                          const changeColorProv = percentChangeProviders > 0 ? '#10b981' : percentChangeProviders < 0 ? '#ef4444' : '#999';
-                          const changeSymbolProv = percentChangeProviders > 0 ? '↑' : percentChangeProviders < 0 ? '↓' : '→';
-                          
-                          return (
-                            <div>
-                              {providerTimeframe !== 'custom' && (
-                                <div style={{ marginBottom: 12, padding: 8, background: '#f0f9ff', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
-                                  <span style={{ fontSize: 13, color: '#333' }}>vs previous:</span>
-                                  <span style={{ fontSize: 14, fontWeight: 600, color: changeColorProv }}>
-                                    {changeSymbolProv} {Math.abs(percentChangeProviders).toFixed(1)}%
-                                  </span>
-                                  <span style={{ fontSize: 12, color: '#666' }}>({prevProvidersTotal} → {currentProvidersTotal})</span>
-                                </div>
-                              )}
-                              <SmallMonthStackedBarChart services={providersLabels} monthLabels={monthLabels} valuesByMonth={valuesByMonth} colors={colors} />
-                            </div>
-                          );
-                        })()
-                      }
-                    </div>
-                </div>
-
-                {/* Row 2, Col 1: Location trends */}
-                <div style={{ background: '#fff', padding: 12, borderRadius: 8, boxShadow: '0 4px 18px rgba(0,0,0,0.04)', minHeight: 500 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ fontWeight: 700, marginBottom: 8 }}>Location trends</div>
-                    <select value={locationFilter} onChange={(e) => setLocationFilter(e.target.value)} style={{ padding: '6px 8px', fontSize: 13 }}>
-                      <option value="state">State</option>
-                      <option value="city">City</option>
-                      <option value="district">District</option>
-                    </select>
-                  </div>
-                  <SmallPieChart data={locationTrends} size={180} colors={['#48bb78','#2f855a','#38a169','#68d391','#9ae6b4']} />
-                </div>
-
-                {/* Row 2, Col 2: Total bookings */}
-                <div style={{ background: '#fff', padding: 12, borderRadius: 8, boxShadow: '0 4px 18px rgba(0,0,0,0.04)', minHeight: 500 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ fontWeight: 700, marginBottom: 8 }}>Total bookings (month-wise)</div>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      <select value={bookingsTimeframe} onChange={(e) => setBookingsTimeframe(e.target.value)} style={{ padding: '6px 8px', fontSize: 13 }}>
-                        <option value="this_month">This month</option>
-                        <option value="last_3">Last 3 months</option>
-                        <option value="last_6">Last 6 months</option>
-                        <option value="custom">Select month</option>
-                      </select>
-                      {bookingsTimeframe === 'custom' && (
-                      <input type="month" value={bookingsCustomMonth} onChange={(e) => setBookingsCustomMonth(e.target.value)} style={{ padding: '6px 8px', fontSize: 13 }} />
-                      )}
-                    </div>
-                  </div>
-                  <div style={{ marginTop: 8 }}>
-                    {
-                      (() => {
-                        const { months, monthLabels } = computeRange(bookingsTimeframe, bookingsCustomMonth);
-                        if (!months || months.length === 0) return <div style={{ color: '#888' }}>No data</div>;
-
-                        const resolveDate = (b) => {
-                          if (!b) return null;
-                          const candidates = [b.createdAt, b.created_at, b.date, b.bookingDate, b.bookedAt, b.createdOn];
-                          for (const c of candidates) {
-                            if (!c) continue;
-                            const d = new Date(c);
-                            if (!isNaN(d)) return d;
-                          }
-                          if (typeof b === 'number' || (typeof b === 'string' && /^\d+$/.test(b))) {
-                            const d = new Date(Number(b));
-                            if (!isNaN(d)) return d;
-                          }
-                          return null;
-                        };
-
-                        // Count total bookings per month
-                        const monthCounts = Array(months.length).fill(0);
-                        for (const b of bookings) {
-                          const d = resolveDate(b);
-                          if (!d) continue;
-                          if (d < months[0] || d >= new Date(months[months.length - 1].getFullYear(), months[months.length - 1].getMonth() + 1, 1)) continue;
-                          for (let mi = 0; mi < months.length; mi++) {
-                            const sStart = months[mi];
-                            const sEnd = new Date(sStart.getFullYear(), sStart.getMonth() + 1, 1);
-                            if (d >= sStart && d < sEnd) {
-                              monthCounts[mi]++;
-                              break;
-                            }
-                          }
-                        }
-
-                        if (monthCounts.every(c => c === 0)) return <div style={{ color: '#888' }}>No data</div>;
-
-                        // Calculate current vs previous period totals
-                        const currentTotal = monthCounts.reduce((a, b) => a + b, 0);
-                        let prevTotal = 0;
-                        let percentChange = 0;
-                        
-                        if (bookingsTimeframe !== 'custom') {
-                          // Calculate previous period
-                          const prevMonths = [];
-                          let prevStart, prevEnd;
-                          
-                          if (bookingsTimeframe === 'this_month') {
-                            const prevMonth = new Date(months[0].getFullYear(), months[0].getMonth() - 1, 1);
-                            prevStart = prevMonth;
-                            prevEnd = new Date(prevMonth.getFullYear(), prevMonth.getMonth() + 1, 1);
-                          } else if (bookingsTimeframe === 'last_3') {
-                            prevStart = new Date(months[0].getFullYear(), months[0].getMonth() - 3, 1);
-                            prevEnd = months[0];
-                          } else if (bookingsTimeframe === 'last_6') {
-                            prevStart = new Date(months[0].getFullYear(), months[0].getMonth() - 6, 1);
-                            prevEnd = months[0];
-                          }
-                          
-                          if (prevStart && prevEnd) {
-                            for (const b of bookings) {
-                              const d = resolveDate(b);
-                              if (!d) continue;
-                              if (d >= prevStart && d < prevEnd) prevTotal++;
-                            }
-                            percentChange = prevTotal === 0 ? (currentTotal > 0 ? 100 : 0) : ((currentTotal - prevTotal) / prevTotal) * 100;
-                          }
-                        }
-
-                        // Render as a simple bar chart (single bar per month, not stacked)
-                        const max = Math.max(...monthCounts, 1);
-                        const chartHeight = 160;
-                        const changeColor = percentChange > 0 ? '#10b981' : percentChange < 0 ? '#ef4444' : '#999';
-                        const changeSymbol = percentChange > 0 ? '↑' : percentChange < 0 ? '↓' : '→';
-                        
-                        return (
-                          <div>
-                            {/* Percentage change indicator */}
-                            {bookingsTimeframe !== 'custom' && (
-                              <div style={{ marginBottom: 12, padding: 8, background: '#f0f9ff', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <span style={{ fontSize: 13, color: '#333' }}>vs previous period:</span>
-                                <span style={{ fontSize: 14, fontWeight: 600, color: changeColor }}>
-                                  {changeSymbol} {Math.abs(percentChange).toFixed(1)}%
-                                </span>
-                                <span style={{ fontSize: 12, color: '#666' }}>({prevTotal} → {currentTotal})</span>
-                              </div>
-                            )}
-                            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', height: chartHeight }}>
-                              {monthCounts.map((count, mi) => (
-                                <div key={mi} style={{ width: 56, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                  {Number(count) > 0 ? (
-                                    <div
-                                      role="img"
-                                      aria-label={`Total ${count} for ${monthLabels[mi]}`}
-                                      title={`${count} total`}
-                                      style={{ fontSize: 12, color: '#333', marginBottom: 6 }}
-                                    >
-                                      {abbreviateNumber(count)}
-                                    </div>
-                                  ) : (
-                                    <div style={{ height: 18 }} />
-                                  )}
-                                  <div
-                                    role="img"
-                                    aria-label={`${monthLabels[mi]} total ${count} bookings`}
-                                    style={{ height: chartHeight, width: 40, borderRadius: 6, background: '#4f46e5', boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.03)', position: 'relative' }}
-                                  >
-                                    <div style={{ height: Math.round((count / max) * chartHeight), width: '100%', background: '#4f46e5', borderRadius: 6, position: 'absolute', bottom: 0 }} />
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                            <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
-                              {monthLabels.map((m, i) => (
-                                <div key={i} style={{ width: 56, textAlign: 'center', fontSize: 12, color: '#333' }}>{m.split(' ')[0]}</div>
-                              ))}
-                            </div>
-                          </div>
-                        );
-                      })()
-                    }
-                  </div>
-                </div>
+              <h3 style={{ marginBottom: 12 }}><b>Analytics</b></h3>
+              <div style={{ marginTop: 20 }}>
+                <AdminCharts bookings={bookings} providers={providers} />
               </div>
             </div>
           </>
@@ -1621,7 +1264,7 @@ const AdminDashboard = () => {
 
         {activeTab === "bookings" && (
           <div className="table wide-table">
-            <h3>Bookings</h3>
+            <h3><b>Bookings</b></h3>
             <table>
               <thead>
                 <tr>
@@ -1650,52 +1293,214 @@ const AdminDashboard = () => {
         )}
 
         {activeTab === "complaints" && (
+        <div>
+          {/* REPORTS SECTION */}
           <div className="table wide-table">
-            <div className="table-header">
-                <h3><b>Reports</b></h3>
-                <button className="manage-btn" onClick={() => setManageProviders((prev) => !prev)}>
-                  {manageProviders ? "Done" : "Manage Providers"}
-                </button>
-              </div>
-            <table>
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Customer</th>
-                  <th>Provider</th>
-                  <th>Report</th>
-                  <th>Created On</th>
-                  {manageProviders && <th>Actions</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {reports.map((r, i) => (
-                  <tr key={i}>
-                    <td>{r.id}</td>
-                    <td>{r.reportedBy.name}</td>
-                    <td>{r.reportedOn.name}</td>
-                    <td>{r.reason}</td>
-                    <td>{r.createdAt}</td>
-                    
-                    {manageProviders && (
-                        <td>
-                          <button className="delete-btn" onClick={() => handleDeleteProvider(i)}>Delete</button>
-                      </td>
-                      )}
+            <div className="table-header" >
+              <h3><b>Reports</b></h3>
+              <button className="manage-btn" onClick={() => setManageReports(prev => !prev)}>
+                {manageReports ? "Done" : "Manage Reports"}
+              </button>
+            </div>
+
+            <div className="table wide-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Customer</th>
+                    <th>Provider</th>
+                    <th>Report</th>
+                    <th>Created On</th>
+                    <th>Status</th>
+                    {manageReports && <th>Actions</th>}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {reportsOnly.map((r, i) => {
+                    const reportedByName = r.reportedBy?.name ?? r.reportedByName ?? r.reportedById ?? 'Unknown';
+                    const reportedOnName = r.reportedOn?.name ?? r.reportedOnName ?? r.reportedOnId ?? 'Unknown';
+                    const created = r.createdAt ? new Date(r.createdAt).toLocaleString() : (r.createdOn ?? '');
+                    const status = r.status ?? r.state ?? 'UNKNOWN';
+
+                    return (
+                      <tr key={r.id ?? i}>
+                        <td>{r.id}</td>
+                        <td>{reportedByName}</td>
+                        <td>{reportedOnName}</td>
+                        <td>{r.reason}</td>
+                        <td>{created}</td>
+                        <td><span className={`status ${String(status).toLowerCase()}`}>{status}</span></td>
+
+                        {manageReports && (
+                        <td>
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            {(() => {
+                              const isFinal = ['APPROVED', 'REJECTED'].includes(String(r.status ?? '').toUpperCase());
+                              const disabled = processingReportId === r.id || isFinal;
+
+                              return (
+                                <>
+                                  <button
+                                    className="approve-btn"
+                                    title="Approve"
+                                    onClick={() => openActionModal && openActionModal(r, 'approved')}
+                                    disabled={disabled}
+                                    aria-disabled={disabled}
+                                  >
+                                    <FaCheck />
+                                  </button>
+
+                                  <button
+                                    className="reject-btn"
+                                    title="Reject"
+                                    onClick={() => openActionModal && openActionModal(r, 'reject')}
+                                    disabled={disabled}
+                                    aria-disabled={disabled}
+                                  >
+                                    <FaTimes />
+                                  </button>
+                                </>
+                              );
+                            })()}
+                          </div>
+                        </td>
+                      )}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* gap between tables */}
+          <div style={{ height: 28 }} />
+
+          {/* REFUNDS SECTION */}
+          <div className="table wide-table">
+            <div className="table-header" >
+              <h3><b>Refund Requests</b></h3>
+              <button className="manage-btn" onClick={() => setManageRefunds(prev => !prev)}>
+                {manageRefunds ? "Done" : "Manage Refunds"}
+              </button>
+            </div>
+
+            <div className="table wide-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Customer</th>                    
+                    <th>Reason</th>
+                    <th>Created On</th>
+                    <th>Status</th>
+                    {manageRefunds && <th>Actions</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {refundsOnly.map((r, i) => {
+                    const reportedByName = r.reportedBy?.name ?? r.reportedByName ?? r.reportedById ?? 'Unknown';
+                    const reportedOnName = r.reportedOn?.name ?? r.reportedOnName ?? r.reportedOnId ?? 'Unknown';
+                    const created = r.createdAt ? new Date(r.createdAt).toLocaleString() : (r.createdOn ?? '');
+                    const status = r.status ?? r.state ?? 'UNKNOWN';
+
+                    return (
+                      <tr key={r.id ?? i}>
+                        <td>{r.id}</td>
+                        <td>{reportedByName}</td>                      
+                        <td>{r.reason}</td>
+                        <td>{created}</td>
+                        <td><span className={`status ${String(status).toLowerCase()}`}>{status}</span></td>
+
+                        {manageRefunds && (
+                        <td>
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            {(() => {
+                              const isFinal = ['APPROVED', 'REJECTED'].includes(String(r.status ?? '').toUpperCase());
+                              const disabled = processingReportId === r.id || isFinal;
+
+                              return (
+                                <>
+                                  <button
+                                    className="approve-btn"
+                                    title="Approve refund"
+                                    onClick={() => openActionModal && openActionModal(r, 'approved')}
+                                    disabled={disabled}
+                                    aria-disabled={disabled}
+                                  >
+                                    <FaCheck />
+                                  </button>
+
+                                  <button
+                                    className="reject-btn"
+                                    title="Reject refund"
+                                    onClick={() => openActionModal && openActionModal(r, 'reject')}
+                                    disabled={disabled}
+                                    aria-disabled={disabled}
+                                  >
+                                    <FaTimes />
+                                  </button>
+                                </>
+                              );
+                            })()}
+                          </div>
+                        </td>
+                      )}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+
+        {/* Admin response modal (reply to report/refund) */}
+        {actionModalOpen && (
+          <div className="a-modal-overlay" onClick={closeActionModal}>
+            <div className="a-modal-left " onClick={e => e.stopPropagation()}>
+              <button style={{ marginLeft: 400, color: '#444' }} alignItems="flex-start" onClick={closeActionModal}>×</button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <h3 style={{ margin: 0, color: '#444' }}>
+                  {actionType === 'approved' ? 'Approved' : 'Reject'} {actionTarget?.category === 'REFUND' ? 'Refund' : 'Report'}
+                </h3>
+                <div style={{ fontSize: 13, color: '#444' }}>
+                  For: <strong>{actionTarget?.reportedOn?.name ?? actionTarget?.reportedOnId}</strong> — Report ID: {actionTarget?.id}
+                </div>
+
+                <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ fontWeight: 600, color: '#444' }}>Reply / Reason</div>
+                  <textarea
+                    rows={6}
+                    value={actionReply}
+                    onChange={(e) => setActionReply(e.target.value)}
+                    placeholder="Type your reply to the customer..."
+                    disabled={actionReadOnly}
+                    style={{ padding: 10, borderRadius: 8, border: '1px solid #e6e6ea', color: '#0f172a' }}
+                  />
+                </label>
+
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                  <button className="report-cancel-btn" onClick={closeActionModal} disabled={processingReportId !== null}>Cancel</button>
+                  <button
+                    className="report-submit-btn"
+                    onClick={submitActionResponse}
+                    disabled={processingReportId !== null || (!actionReply && actionType === 'reject')} // require reply for reject
+                  >
+                    {processingReportId === actionTarget?.id ? 'Processing…' : 'Done'}
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
-        {activeTab === "settings" && (
-          <div>
-            <h3>Settings</h3>
-          </div>
-        )}
+
+
       </main>
-
       {/* Document modal fallback */}
       {docModalOpen && (
         <div className="a-modal-overlay" onClick={closeDocModal}>

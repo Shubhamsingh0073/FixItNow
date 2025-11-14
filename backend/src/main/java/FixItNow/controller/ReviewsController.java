@@ -24,11 +24,7 @@ public class ReviewsController {
     @Autowired
     private UsersManager usersManager;
 
-    /**
-     * POST /reviews/create
-     * Body: { "bookingId": "...", "rating": 4, "comment": "..." }
-     * Authorization: Bearer <token> (must be the customer who made the booking)
-     */
+
     @PostMapping("/create")
     public ResponseEntity<?> createReview(
             @RequestHeader(value = "Authorization", required = false) String authHeader,
@@ -62,7 +58,6 @@ public class ReviewsController {
             }
             String comment = payload.get("comment") != null ? payload.get("comment").toString() : null;
 
-            // Validation will be done in manager and will return meaningful messages
             Reviews created = reviewsManager.createReview(bookingId, customer.getId(), rating, comment);
 
             return ResponseEntity.status(HttpStatus.CREATED)

@@ -22,6 +22,21 @@ public class Report {
 
     @Lob
     private String reason;
+    
+    @Lob
+    private String reply;
+    
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private ReportEnum.Status status = ReportEnum.Status.PENDING;
+    
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private ReportEnum.Category category;
+    
+    @ManyToOne
+    @JoinColumn(name = "booking_id", nullable = false)
+    private Booking booking;
 
     @CreationTimestamp
     private LocalDateTime createdAt;
@@ -58,6 +73,38 @@ public class Report {
 
     public void setReason(String reason) {
         this.reason = reason;
+    }
+    
+    public String getReply() {
+        return reply;
+    }
+
+    public void setReply(String reply) {
+        this.reply = reply;
+    }
+    
+    public ReportEnum.Status getStatus() {
+        return status;
+    }
+
+    public void setStatus(ReportEnum.Status status) {
+        this.status = status;
+    }
+
+    public ReportEnum.Category getCategory() {
+        return category;
+    }
+
+    public void setCategory(ReportEnum.Category category) {
+        this.category = category;
+    }
+    
+    public Booking getBooking() {
+        return booking;
+    }
+
+    public void setBooking(Booking booking) {
+        this.booking = booking;
     }
 
     public LocalDateTime getCreatedAt() {

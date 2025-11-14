@@ -45,7 +45,6 @@
 
 # Local docs or helpers that shouldn't be committed
 /backend/HELP.md
-
 # ------------------------
 # Editors and IDEs
 # ------------------------

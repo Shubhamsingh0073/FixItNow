@@ -88,15 +88,12 @@ public class ServicesController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(Collections.singletonMap("message", "Service not found"));
         }
-        // Assuming one service per provider, adjust if multiple
         Services service = servicesList.get(0);
         
         ObjectMapper mapper = new ObjectMapper();
 
-        // If availability is stored as JSON string, parse it back to a Map
         Map<String, Object> response = new HashMap<>();
         response.put("description", service.getDescription());
-        // If availability is stored as JSON string:
         try {
         	
         	Map<String, String> availability = mapper.readValue(service.getAvailability(), new TypeReference<Map<String, String>>() {});
@@ -107,18 +104,15 @@ public class ServicesController {
         
         response.put("category", service.getCategory());
 
-        // NEW: subcategories (deserialize JSON stored in TEXT column to a Map)
         try {
             String subJson = service.getSubcategory();
             if (subJson == null || subJson.trim().isEmpty()) {
                 response.put("subcategories", new HashMap<>());
             } else {
-                // deserialize into Map<String, Object> so prices can be numbers
                 Map<String, Object> subMap = mapper.readValue(subJson, new TypeReference<Map<String, Object>>() {});
                 response.put("subcategories", subMap);
             }
         } catch (Exception e) {
-            // fallback to empty map on parse error
             response.put("subcategories", new HashMap<>());
         }
         
@@ -132,26 +126,22 @@ public class ServicesController {
             @PathVariable("id") String id,
             @RequestBody Map<String, Object> body) {
 
-        // Expect payload like: { "verified": true } or { "verified": "VERIFIED" }
         Object verifiedObj = body.get("verified");
         if (verifiedObj == null) {
             return ResponseEntity.badRequest().body(Map.of("message", "Missing 'verified' in body"));
         }
 
-        // load entity (id is String)
         Optional<Services> opt = servicesRepository.findById(id);
         if (opt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
         Services service = opt.get();
 
-        // convert payload into ServicesVerified
         ServicesVerified newStatus;
         if (verifiedObj instanceof Boolean) {
             boolean b = (Boolean) verifiedObj;
             newStatus = b ? ServicesVerified.APPROVED : ServicesVerified.REJECTED;
         } else {
-            // allow passing enum name directly like "VERIFIED" or "PENDING"
             try {
                 newStatus = ServicesVerified.valueOf(String.valueOf(verifiedObj).toUpperCase());
             } catch (IllegalArgumentException ex) {

@@ -28,7 +28,6 @@ public class ChatController {
         this.messageRepository = messageRepository;
     }
 
-    // Return history as array of simple DTOs
     @GetMapping("/api/chat/history")
     public List<MessageDTO> getHistory(@RequestParam String userA, @RequestParam String userB) {
         List<Message> msgs = messageRepository.findConversation(userA, userB);
@@ -42,9 +41,7 @@ public class ChatController {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Return conversation summaries for a given user (peer id, peer name, last message, lastAt)
-     */
+    
     @GetMapping("/api/chat/conversations")
     public List<ConversationSummary> getConversations(@RequestParam String userId) {
         List<Message> msgs = messageRepository.findBySender_IdOrReceiver_IdOrderBySentAtDesc(userId, userId);

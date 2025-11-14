@@ -1,0 +1,178 @@
+.admin-charts-root {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0;
+}
+
+/* grid: two columns; responsive stack on small screens */
+.charts-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 18px;
+}
+
+/* Card */
+.chart-card {
+    background: #ffffff;
+    padding: 14px;
+    border-radius: 12px;
+    box-shadow: 0 8px 28px rgba(15, 23, 42, 0.04);
+    min-height: 340px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+/* Header */
+.chart-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+/* Title */
+.chart-title {
+    margin: 0;
+    font-size: 16px;
+    color: #111827;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+}
+
+/* Chart body */
+.chart-body {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px;
+}
+
+/* Center utility */
+.centered-chart {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+}
+
+/* For split layouts (legend left, chart right) */
+.split-chart {
+    display: flex;
+    width: 100%;
+    gap: 12px;
+    align-items: center;
+    justify-content: center;
+}
+
+.legend-col {
+    width: 32%;
+    max-height: 260px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-right: 6px;
+}
+
+.chart-col {
+    width: 68%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* legend rows */
+.legend-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 6px;
+    font-size: 13px;
+    color: #0f172a;
+}
+
+.legend-color {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    display: inline-block;
+    flex: 0 0 auto;
+    box-shadow: 0 1px 3px rgba(2, 6, 23, 0.06);
+}
+
+.legend-label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* small empty state */
+.empty {
+    color: #6b7280;
+    padding: 8px;
+    font-size: 13px;
+}
+
+/* controls */
+.loc-controls select,
+.line-controls select,
+.months-controls select {
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 1px solid #e6e6ea;
+    background: #fff;
+    font-size: 13px;
+    color: #0f172a;
+    margin-left: 8px;
+}
+
+/* reduce axis font sizes */
+.recharts-cartesian-axis-tick text {
+    font-size: 11px;
+    fill: #475569;
+}
+
+/* remove focus outline / black highlight on click */
+svg:focus,
+.recharts-surface:focus,
+.recharts-legend-item:focus {
+    outline: none;
+}
+
+/* tooltip styling */
+.recharts-tooltip-wrapper .recharts-default-tooltip {
+    border-radius: 8px;
+    box-shadow: 0 6px 20px rgba(2, 6, 23, 0.08);
+    font-size: 13px;
+}
+
+/* top-right year indicator for line chart */
+.line-top-right {
+    position: absolute;
+    top: 65px;
+    right: 40px;
+    font-size: 13px;
+    color: #475569;
+    font-weight: 600;
+}
+
+/* responsive */
+@media (max-width: 980px) {
+    .charts-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .legend-col {
+        width: 34%;
+    }
+
+    .chart-col {
+        width: 66%;
+    }
+
+    .chart-card {
+        min-height: 360px;
+    }
+}

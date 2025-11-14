@@ -535,7 +535,7 @@
 
 .profile-info-box {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 2.2rem;
     padding: 2rem 2.5rem;
 }

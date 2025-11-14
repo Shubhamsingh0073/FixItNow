@@ -46,10 +46,9 @@ public class DataLoader implements CommandLineRunner {
             provider.setPassword("password123");
             provider.setName("Provider");
             provider.setRole(UserRole.PROVIDER);
-            Users savedProvider = userRepository.save(provider); // <-- Fix is here!
+            Users savedProvider = userRepository.save(provider); 
             System.out.println("Sample user 'provider' created.");
 
-            // Add a service for this provider
             Services service = servicesManager.createDefaultServiceForProvider(savedProvider);
             System.out.println("Sample service for 'provider' created with id: " + service.getId());
         } else {

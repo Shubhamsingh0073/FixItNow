@@ -413,18 +413,10 @@
   gap: 2.3rem;
 }
 
-.profile-info-box {
-  background: white;
-  border-radius: 1rem;
-  box-shadow: 0 4px 10px rgba(107, 70, 193, 0.09);
-  display: flex;
-  align-items: center;
-  gap: 2.2rem;
-  min-width: 350px;
-  max-width: 650px;
-  width: 100%;
-  padding: 2rem 2.5rem;
-  margin-bottom: 0.5rem;
+
+.profile-info-box
+.wide-profile-box {
+  align-items: flex-start;
 }
 
 .profile-info-left {
@@ -492,7 +484,6 @@
 /* Profile actions box */
 .profile-actions-box {
   width: 100%;
-  max-width: 650px;
   background: white;
   border-radius: 1rem;
   box-shadow: 0 4px 10px rgba(107, 70, 193, 0.09);
@@ -652,6 +643,7 @@
 
 .report-container {
   margin-top: 0.75rem;
+  
 }
 
 /* The form box */
@@ -661,7 +653,7 @@
   padding: 12px;
   border-radius: 8px;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.04);
-  max-width: 640px;
+  width: 100%;
 }
 
 /* Field wrapper */
@@ -721,4 +713,87 @@
 .report-cancel-btn[disabled] {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* Report card base (you already have some inline styles; this matches them) */
+.report-card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
+  border: 1px solid #f1f5f9;
+}
+
+/* Status badge */
+.report-status {
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 12px;
+  text-transform: uppercase;
+  color: #fff;
+}
+
+/* status-specific colors */
+.report-status.pending {
+  background: #f6ad55;
+}
+
+/* orange */
+.report-status.approved {
+  background: #48bb78;
+}
+
+/* green */
+.report-status.rejected {
+  background: #f56565;
+}
+
+/* red */
+.report-status.in_progress {
+  background: #63b3ed;
+}
+
+/* blue */
+.report-status.completed {
+  background: #68d391;
+}
+
+/* light green */
+
+/* fallback */
+.report-status[class="report-status"] {
+  background: #94a3b8;
+}
+
+/* Admin reply block inside report / refund cards */
+.admin-reply {
+  margin-top: 10px;
+  background: #f8fafc;
+  /* pale background */
+  border-left: 3px solid #2b6cb0;
+  /* colored accent */
+  padding: 10px 12px;
+  border-radius: 6px;
+  color: #0f172a;
+}
+
+.admin-reply-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.admin-reply-text {
+  margin-top: 6px;
+  font-size: 13px;
+  color: #334155;
+  white-space: pre-wrap;
+  /* preserve newlines if reply has them */
+}
+
+.admin-reply-time {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #6b7280;
 }
