@@ -183,7 +183,6 @@ const Login = () => {
           <h1>Fix It Now</h1>
           <p>Please sign in to your account</p>
         </div>
-
         <div className="form-section">
           <form onSubmit={handleSubmit}>
             {/* Role Selector */}

@@ -18,10 +18,17 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(-45deg, #6b46c1, #805ad5, #4834d4, #2b6cb0);
-  background-size: 400% 400%;
+  background-image: url('/src/toolsw3-bg.jpg');
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
   animation: gradientBG 15s ease infinite;
   padding: 2rem;
+}
+
+.auth-bg > * {
+  position: relative;
+  z-index: 1;
 }
 
 /* Make the login box a little wider */

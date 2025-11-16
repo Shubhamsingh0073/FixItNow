@@ -25,97 +25,10 @@
     }
 }
 
-/* Sidebar */
-.sidebar {
-    width: 250px;
-    background: rgba(255, 255, 255, 0.97);
-    color: #6b46c1;
-    padding: 28px 18px 18px 18px;
-    box-shadow: 2px 0 18px rgba(80, 36, 143, 0.09);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    min-width: 250px;
-}
 
-.logo {
-    font-size: 2.1rem;
-    font-weight: bold;
-    color: #6b46c1;
-    margin-bottom: 0.2rem;
-    letter-spacing: 1px;
-}
-
-.sidebar-subtitle {
-    font-size: 1.12rem;
-    color: #4a5568;
-    font-weight: 600;
-    margin-bottom: 1.7rem;
-    letter-spacing: 1px;
-}
-
-.sidebar ul {
-    list-style: none;
-    padding: 0;
-    width: 100%;
-    margin-bottom: auto;
-}
-
-.sidebar li {
-    margin: 17px 0;
-    cursor: pointer;
-    font-size: 1.09rem;
-    color: #4a5568;
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 10px 16px;
-    border-radius: 0.7rem;
-    font-weight: 600;
-    transition: background 0.16s, color 0.16s;
-}
-
-.sidebar li.active,
-.sidebar li:hover {
-    background: linear-gradient(135deg, #6b46c1, #2b6cb0);
-    color: #fff;
-}
-
-.sidebar-heading {
-    cursor: default !important;
-    background: none !important;
-    color: #2b6cb0 !important;
-    font-weight: bold !important;
-    pointer-events: none;
-}
-
-.sidebar-bottom {
-    width: 100%;
-    margin-top: 2rem;
-    display: flex;
-    justify-content: center;
-}
-
-.logout-button {
-    width: 100%;
-    padding: 0.8rem 1rem;
-    background: #e53e3e;
-    color: white;
-    border: none;
-    border-radius: 0.8rem;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.8rem;
-    cursor: pointer;
-    transition: background 0.3s, transform 0.3s;
-    font-size: 1.05rem;
-}
-
-.logout-button:hover {
-    background: #c53030;
-    transform: translateY(-2px);
+:root {
+    --sidebar-width: 240px;
+    --sidebar-collapsed-width: 72px;
 }
 
 /* Main content */
@@ -124,6 +37,12 @@
     padding: 32px 30px;
     background: rgba(255, 255, 255, 0.93);
     overflow-y: auto;
+    transition: margin-left 220ms ease;
+    margin-left: var(--sidebar-width);
+}
+
+body.sidebar-collapsed .main {
+    margin-left: var(--sidebar-collapsed-width);
 }
 
 .stats {
@@ -352,11 +271,6 @@
         padding: 12px 2px;
     }
 
-    .sidebar {
-        min-width: 170px;
-        padding: 16px 4px 4px 4px;
-    }
-
     .wide-table,
     .complaint-card {
         max-width: 96vw;
@@ -536,3 +450,4 @@
     max-height: 90vh;
     overflow: auto;
 }
+

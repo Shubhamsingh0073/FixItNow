@@ -3,19 +3,8 @@ import { FaMapMarkerAlt, FaUserCircle, FaPhone, FaEnvelope, FaHome, FaCalendarAl
 import './ProviderDashboard.css';
 import CustomerWideCard from './CustomerWideCard';
 import ChatPanel from './ChatPanel';
+import Sidebar from "./Sidebar"
 
-
-// Mock data for customers
-const mockCustomers = [
-  { id: 1, name: 'Alice Johnson', phone: '+1234567890', email: 'alice@email.com', category: 'Plumbing' },
-  { id: 2, name: 'Bob Smith', phone: '+1987654321', email: 'bob@email.com', category: 'Electrical' },
-  { id: 3, name: 'Carol Lee', phone: '+1472583690', email: 'carol@email.com', category: 'Carpentry' },
-  { id: 4, name: 'David King', phone: '+1357924680', email: 'david@email.com', category: 'Cleaning' },
-  { id: 5, name: 'Emma Brown', phone: '+1122334455', email: 'emma@email.com', category: 'Appliance Repair' }
-];
-
-// Mock bookings (initial past bookings)
-const mockPastBookings = [];
 
 // Mock provider profile
 const initialProvider = {
@@ -55,10 +44,16 @@ const ProviderDashboard = () => {
 
   const [userData, setUserData] = useState({ name: '', email: '' });
 
+   const providerMenu = [
+      { key: "home", label: "Home", icon: <FaHome /> },
+      { key: "bookings", label: "Bookings", icon: <FaCalendarAlt /> },
+      { key: "Chat", label: "Messages", icon: <FaFacebookMessenger /> },
+      { key: "profile", label: "Profile", icon: <FaUserCircle /> },
+    ];
+
   // Sidebar navigation
   const [activePage, setActivePage] = useState('home');
-  const [requests, setRequests] = useState(mockCustomers);
-  const [pastBookings, setPastBookings] = useState(mockPastBookings); // <-- new state
+  const [pastBookings, setPastBookings] = useState([]); 
   const [acceptedRequest, setAcceptedRequest] = useState(null);
   const [currentBookingStatus, setCurrentBookingStatus] = useState('Confirmed');
   const [provider, setProvider] = useState(initialProvider);
@@ -629,31 +624,14 @@ useEffect(() => {
 
   return (
     <div className="provider-dashboard-root">
-      {/* Side Panel */}
-      <div className="sidebar">
-        <div className="sidebar-title">FixItNow</div>
-        <div className="sidebar-subtitle">Provider</div>
-        <nav className="sidebar-nav">
-          <button className={activePage === 'home' ? 'active' : ''} onClick={() => setActivePage('home')}>
-            <FaHome /> Home
-          </button>
-          <button className={activePage === 'bookings' ? 'active' : ''} onClick={() => setActivePage('bookings')}>
-            <FaCalendarAlt /> Bookings
-          </button>
-          <button className={activePage === 'Chat' ? 'active' : ''} onClick={() => setActivePage('Chat')}>
-            <FaFacebookMessenger /> Chat
-          </button>
-          <button className={activePage === 'profile' ? 'active' : ''} onClick={() => setActivePage('profile')}>
-            <FaUserCircle /> Profile
-          </button>
-          
-        </nav>
-        <div className="sidebar-bottom">
-          <button className="logout-button" onClick={handleLogout}>
-            <FaSignOutAlt /> Logout
-          </button>
-        </div>
-      </div>
+      {/* Sidebar */}
+        <Sidebar
+          activeTab={activePage}
+          onActivate={(k) => setActivePage(k)}
+          menu={providerMenu}        
+          showLogoOnCollapsed={true}
+          handleLogout={() => {handleLogout()}}
+        />
 
       {/* Main Content */}
       <div className="dashboard-main">

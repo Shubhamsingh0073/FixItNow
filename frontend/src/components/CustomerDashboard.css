@@ -1,4 +1,4 @@
-/* Dashboard root & sidebar styling */
+/* Dashboard root */
 .dashboard-root {
   display: flex;
   min-height: 100vh;
@@ -21,87 +21,10 @@
   }
 }
 
-.sidebar {
-  width: 250px;
-  background: rgba(255, 255, 255, 0.99);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 2rem 1rem 1rem 1rem;
-  box-shadow: 2px 0 16px rgba(80, 36, 143, 0.09);
-}
 
-.sidebar-title {
-  font-size: 2rem;
-  font-weight: bold;
-  color: #6b46c1;
-  margin-bottom: 2rem;
-}
-
-.sidebar-subtitle {
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: #4834d4;
-  margin-bottom: 1.2rem;
-}
-
-.sidebar-nav {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 1.2rem;
-  margin-bottom: auto;
-}
-
-.sidebar-nav button {
-  width: 100%;
-  text-align: left;
-  background: none;
-  border: none;
-  font-size: 1.1rem;
-  color: #4a5568;
-  padding: 0.7rem 1rem;
-  border-radius: 0.8rem;
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s, color 0.2s;
-}
-
-.sidebar-nav button.active,
-.sidebar-nav button:hover {
-  background: linear-gradient(135deg, #6b46c1, #2b6cb0);
-  color: #fff;
-}
-
-.sidebar-bottom {
-  width: 100%;
-  margin-top: 2rem;
-  display: flex;
-  justify-content: center;
-}
-
-.logout-button {
-  width: 100%;
-  padding: 0.8rem 1rem;
-  background: #e53e3e;
-  color: white;
-  border: none;
-  border-radius: 0.8rem;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.8rem;
-  cursor: pointer;
-  transition: background 0.3s, transform 0.3s;
-}
-
-.logout-button:hover {
-  background: #c53030;
-  transform: translateY(-2px);
+:root {
+  --sidebar-width: 240px;
+  --sidebar-collapsed-width: 72px;
 }
 
 /* Main dashboard styling */
@@ -109,6 +32,12 @@
   flex: 1;
   padding: 2.5rem 3rem;
   overflow: auto;
+  transition: margin-left 220ms ease;
+  margin-left: var(--sidebar-width);
+}
+
+body.sidebar-collapsed .dashboard-main {
+  margin-left: var(--sidebar-collapsed-width);
 }
 
 .dashboard-header {
@@ -590,11 +519,6 @@
     padding: 1.2rem 0.5rem;
   }
 
-  .sidebar {
-    width: 210px;
-    padding: 1.2rem 0.5rem 0.5rem 0.5rem;
-  }
-
   .profile-info-box,
   .profile-actions-box {
     max-width: 98vw;
@@ -605,25 +529,6 @@
 @media (max-width: 768px) {
   .dashboard-root {
     flex-direction: column;
-  }
-
-  .sidebar {
-    width: 100%;
-    flex-direction: row;
-    padding: 1rem 0.5rem;
-    box-shadow: none;
-    border-bottom: 1px solid #e2e8f0;
-    justify-content: space-between;
-  }
-
-  .sidebar-title {
-    margin-bottom: 0;
-  }
-
-  .sidebar-nav {
-    flex-direction: row;
-    gap: 0.4rem;
-    margin-bottom: 0;
   }
 
   .dashboard-main {
@@ -638,8 +543,6 @@
     padding: 1.2rem 0.8rem;
   }
 }
-
-
 
 .report-container {
   margin-top: 0.75rem;

@@ -1,0 +1,242 @@
+/* Sidebar.css - styles for the collapsible sidebar */
+
+.sidebar {
+    width: 240px;
+    min-width: 240px;
+    background: #ffffff;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+    padding: 28px 15px 18px 15px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transition: width 220ms ease;
+    height: 100vh;
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: 40;
+    overflow: visible;
+}
+
+.sidebar li {
+    margin: 17px 0;
+    font-size: 1.09rem;
+    font-weight: 600;
+}
+
+/* Collapsed narrow rail */
+.sidebar.collapsed {
+    width: 72px;
+    min-width: 72px;
+}
+
+/* top area */
+.sidebar-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px;
+}
+
+/* toggle button */
+.sidebar-toggle {
+    background: transparent;
+    border: 1px solid #e6e6ea;
+    border-radius: 8px;
+    padding: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #374151;
+    transition: background .18s, color .18s;
+}
+
+.sidebar-toggle:hover {
+    background: rgba(107, 70, 193, 0.06);
+    color: #6b46c1;
+}
+
+/* brand */
+.sidebar-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    overflow: hidden;
+    flex: 1;
+}
+
+/* logo image */
+.sidebar-logo {
+    width: 36px;
+    height: 36px;
+    object-fit: contain;
+    display: block;
+    border-radius: 8px;
+}
+
+/* text label — hidden when collapsed */
+.sidebar-brand-text {
+    white-space: nowrap;
+    transition: opacity 180ms ease, transform 180ms ease;
+    font-size: 2rem;
+    font-weight: bold;
+    color: #6b46c1;
+    margin-bottom: 2rem;
+}
+
+.sidebar.collapsed .sidebar-brand-text {
+    opacity: 0;
+    transform: translateX(-6px);
+    pointer-events: none;
+    width: 0;
+    height: 0;
+}
+
+/* nav */
+.sidebar-nav {
+    margin-top: 1px;
+    flex: 1;
+    width: 100%;
+}
+
+.sidebar-nav ul {
+    list-style: none;
+    flex-direction: column;
+    width: 100%;
+}
+
+.sidebar-nav li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    color: #374151;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background .16s, color .16s, justify-content .18s, padding .18s;
+}
+
+.sidebar-nav li:hover {
+    background: #f7f7fb;
+    color: #111827;
+}
+
+/* center icons when collapsed */
+.sidebar.collapsed .sidebar-nav li {
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+/* icon and label */
+.sidebar-icon {
+    font-size: 18px;
+    min-width: 18px;
+    min-height: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.sidebar-label {
+    font-weight: 600;
+    transition: opacity .16s ease, transform .16s ease;
+}
+
+.sidebar.collapsed .sidebar-label {
+    opacity: 0;
+    transform: translateX(-6px);
+    pointer-events: none;
+    width: 0;
+    height: 0;
+}
+
+/* active */
+.sidebar-nav li.active {
+    background: linear-gradient(90deg, #6b46c1, #2b6cb0);
+    color: #fff;
+    box-shadow: 0 6px 18px rgba(59, 53, 120, 0.08);
+}
+
+/* bottom */
+.sidebar-bottom {
+    margin-top: auto;
+    padding: 12px;
+}
+
+.sidebar-logout {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: transparent;
+    font-size: large;
+    border: none;
+    cursor: pointer;
+    color: #374151;
+}
+
+.sidebar.collapsed .sidebar-logout {
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+/* main content shift — ensure you toggle class on <main> as well */
+.main {
+    transition: margin-left 220ms ease;
+    margin-left: 240px;
+}
+
+.main.sidebar-collapsed {
+    margin-left: 72px;
+}
+
+/* responsive adjustments */
+@media (max-width: 760px) {
+    .sidebar {
+        position: fixed;
+        left: 0;
+        top: 0;
+        height: 100vh;
+    }
+
+    .main {
+        margin-left: 72px;
+    }
+}
+
+.sidebar-container {
+    position: relative;
+}
+
+.sidebar-toggle-outside {
+    position: fixed;
+    top: 20px;
+    left: calc(var(--sidebar-width) - 7px);
+    background: #fff;
+    color: #374151;
+    width: 25px;
+    height: 36px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 999;
+    /* ensure it's on top */
+    transition: left 220ms ease, background 140ms ease, color 140ms ease;
+}
+
+/* hover style */
+.sidebar-toggle-outside:hover {
+    color: #6b46c1;
+}
+
+/* adjust toggle when collapsed */
+.sidebar-toggle-outside.collapsed {
+    left: calc(var(--sidebar-collapsed-width) - 7px);
+}

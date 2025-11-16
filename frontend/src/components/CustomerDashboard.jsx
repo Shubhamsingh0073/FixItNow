@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FaMapMarkerAlt, FaSearch, FaTools, FaStar, FaPhone, FaEnvelope, FaExclamationTriangle, FaUser, FaHome, FaCalendarAlt, FaUserCircle, FaSignOutAlt, FaQuestionCircle, FaRegComments, FaRegThumbsUp, FaEdit, FaTimes, FaCheck, FaToolbox, FaClock, FaMoneyBillWave } from 'react-icons/fa';
+import { FaMapMarkerAlt, FaSearch, FaTools, FaStar, FaPhone, FaEnvelope, FaFacebookMessenger, FaExclamationTriangle, FaUser, FaHome, FaCalendarAlt, FaUserCircle, FaSignOutAlt, FaQuestionCircle, FaRegComments, FaRegThumbsUp, FaEdit, FaTimes, FaCheck, FaToolbox, FaClock, FaMoneyBillWave } from 'react-icons/fa';
 import './CustomerDashboard.css';
 import ProviderModal from "./ProviderModal";
 import ChatPanel from "./ChatPanel";
+import Sidebar from "./Sidebar"
 
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -11,13 +12,13 @@ import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 
+
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: markerIcon2x,
   iconUrl: markerIcon,
   shadowUrl: markerShadow,
 });
-
 
 const categories = [
   { id: 'all', name: 'All Services' },
@@ -27,7 +28,6 @@ const categories = [
   { id: 'cleaning', name: 'Cleaning' },
   { id: 'appliance', name: 'Appliance Repair' }
 ];
-
 
 async function geocodeAddress(address) {
   const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`);
@@ -49,8 +49,14 @@ const CustomerDashboard = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [currentUser, setCurrentUser] = useState({ name: 'Customer Name', email: 'customer@email.com', phone: '' });
-  // userData added to hold id/name used by chat endpoints
   const [userData, setUserData] = useState(null);
+
+  const customerMenu = [
+      { key: "home", label: "Home", icon: <FaHome /> },
+      { key: "bookings", label: "Bookings", icon: <FaCalendarAlt /> },
+      { key: "Chat", label: "Messages", icon: <FaFacebookMessenger /> },
+      { key: "profile", label: "Profile", icon: <FaUserCircle /> },
+    ];
 
   const [activePage, setActivePage] = useState('home');
   const [phoneInput, setPhoneInput] = useState('');
@@ -316,7 +322,6 @@ const CustomerDashboard = () => {
     'IN_PROGRESS',
   ]);
 
-  // provider ids that currently have an active booking (case-insensitive)
   const activeBookedProviderIds = new Set(
     (customerBookings || [])
       .filter(b => {
@@ -327,7 +332,6 @@ const CustomerDashboard = () => {
       .map(b => String(b.providerId))
   );
 
-  // homeProviders: show providers that do NOT have an active booking
   const homeProviders = filteredProviders.filter(p => {
     const pid = String(p.id ?? '');
     return !activeBookedProviderIds.has(pid);
@@ -337,7 +341,6 @@ const CustomerDashboard = () => {
   const reportBookingOptions = React.useMemo(() => {
     if (!Array.isArray(customerBookings)) return [];
     return customerBookings.map(b => {
-      // b expected shape: { bookingId, providerId, bookingDate, status, ... }
       const providerName = getProviderNameById(b.providerId);
       const formattedDate = b.bookingDate ? (new Date(b.bookingDate)).toLocaleString() : '';
       const label = `${providerName}${formattedDate ? ` — ${formattedDate}` : ''}`;
@@ -347,18 +350,15 @@ const CustomerDashboard = () => {
         label,
         status: b.status
       };
-    }).filter(opt => opt.bookingId); // keep only valid booking ids
+    }).filter(opt => opt.bookingId); 
   }, [customerBookings, serviceProviders]);
 
-   // Refund options
   const [showRefundForm, setShowRefundForm] = useState(false);
 
-  // refundOptions: only providers from bookings where booking.status === 'CANCELLED'
   const refundBookingOptions = React.useMemo(() => {
     return reportBookingOptions.filter(opt => String(opt.status || '').trim().toLowerCase() === 'cancelled');
   }, [reportBookingOptions]);
 
-  // Unified submit: category should be "REPORT" or "REFUND".
   const handleSubmitReportOrRefund = async (category = "REPORT", bookingIdArg = null) => {
     const bookingId = bookingIdArg ?? reportBookingId;
     const reporterId = (userData && userData.id) || localStorage.getItem('userId');
@@ -376,11 +376,9 @@ const CustomerDashboard = () => {
       return;
     }
 
-    // Find the booking in local state to get providerId (defensive)
     const booking = (customerBookings || []).find(b => String(b.bookingId ?? b.id) === String(bookingId));
     const reportedOnId = booking?.providerId ?? booking?.provider?.id ?? null;
     if (!reportedOnId) {
-      // fallback: some option records include providerId in the option list
       const optFromList = reportBookingOptions.find(o => String(o.bookingId) === String(bookingId));
       if (optFromList) reportedOnId = optFromList.providerId;
     }
@@ -397,7 +395,7 @@ const CustomerDashboard = () => {
         reportedById: reporterId,
         reportedOnId: reportedOnId,
         reason: reportText.trim(),
-        category: String(category).toUpperCase(),   // "REPORT" or "REFUND"
+        category: String(category).toUpperCase(),
         bookingId: bookingId
       };
 
@@ -420,7 +418,6 @@ const CustomerDashboard = () => {
       const resp = await res.json().catch(() => null);
       console.log('Created report/refund:', resp);
 
-      // Reset form fields
       setReportText('');
       setReportBookingId('');
       setRefundBookingId('');
@@ -435,10 +432,7 @@ const CustomerDashboard = () => {
       setReportSubmitting(false);
     }
   };
-
-
   
-  // load conversations for customer when Chat tab active
   useEffect(() => {
     const ADMIN_PEER_ID = 'U10';
     const ADMIN_PEER_NAME = 'Admin';
@@ -732,36 +726,14 @@ const handleConnect = (provider, bookingDate, selectedServicesFromModal, selecte
 
   return (
     <div className="dashboard-root">
-      <div className="sidebar">
-        <div className="sidebar-title">FixItNow</div>
-        <div className="sidebar-subtitle">CUSTOMER</div>
-        <nav className="sidebar-nav">
-          <button className={activePage === 'home' ? 'active' : ''}
-                  onClick={() => setActivePage('home')}>
-            <FaHome /> Home
-          </button>
-          <button className={activePage === 'bookings' ? 'active' : ''}
-                  onClick={() => setActivePage('bookings')}>
-            <FaCalendarAlt /> Bookings
-          </button>
-          {/* Chat tab for customer */}
-          <button className={activePage === 'Chat' ? 'active' : ''}
-                  onClick={() => setActivePage('Chat')}>
-            <FaRegComments /> Messages
-          </button>
-          <button className={activePage === 'profile' ? 'active' : ''}
-                  onClick={() => setActivePage('profile')}>
-            <FaUserCircle /> Profile
-          </button>
-
-          
-        </nav>
-        <div className="sidebar-bottom">
-          <button className="logout-button" onClick={handleLogout}>
-            <FaSignOutAlt /> Logout
-          </button>
-        </div>
-      </div>
+      {/* Sidebar */}
+        <Sidebar
+          activeTab={activePage}
+          onActivate={(k) => setActivePage(k)}
+          menu={customerMenu}        
+          showLogoOnCollapsed={true}
+          handleLogout={() => {handleLogout()}}
+        />
 
       <div className="dashboard-main">
         {activePage === 'home' && (

@@ -9,46 +9,8 @@ import "./AdminDashboard.css";
 import Reviews from "./Reviews";
 import ChatPanel from "./ChatPanel";
 import AdminCharts from "./AdminCharts";
+import Sidebar from "./Sidebar"
 
-const userExamples = [
-  { name: "Suresh Kumar", email: "suresh.k@example.com", role: "Customer" },
-  { name: "Priya Sharma", email: "priya.s@example.com", role: "Provider" },
-  { name: "Arun Raj", email: "arunr@example.com", role: "Customer" },
-  { name: "Meena Reddy", email: "meena.r@example.com", role: "Provider" },
-  { name: "Rahul Yadav", email: "rahul.y@example.com", role: "Customer" },
-  { name: "Deepa Patel", email: "deepa.p@example.com", role: "Provider" },
-  { name: "Vijay Singh", email: "vijay.s@example.com", role: "Customer" },
-  { name: "Rita Menon", email: "rita.m@example.com", role: "Provider" },
-  { name: "Manoj Kumar", email: "manoj.k@example.com", role: "Customer" },
-  { name: "Sunita Rao", email: "sunita.r@example.com", role: "Provider" },
-];
-
-const complaints = [
-  {
-    user: "Rahul Yadav",
-    provider: "Priya Sharma",
-    complaint: "Service not completed on time. Provider was late.",
-    date: "2025-10-02",
-  },
-  {
-    user: "Deepa Patel",
-    provider: "Meena Reddy",
-    complaint: "Unprofessional behavior during service.",
-    date: "2025-09-30",
-  },
-  {
-    user: "Vijay Singh",
-    provider: "Rita Menon",
-    complaint: "Charged extra amount than agreed.",
-    date: "2025-09-28",
-  },
-  {
-    user: "Sunita Rao",
-    provider: "Ajay Malhotra",
-    complaint: "Damaged appliance during repair.",
-    date: "2025-09-25",
-  },
-];
 
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState("home");
@@ -60,40 +22,36 @@ const AdminDashboard = () => {
   const [bookings, setBookings] = useState([]);
   const [reports, setReports] = useState([]);
 
-
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [selectedProvider, setSelectedProvider] = useState(null);
   const [processingServiceId, setProcessingServiceId] = useState(null);
 
-
   const [reviews, setReviews] = useState([]);
   const [loadingReviews, setLoadingReviews] = useState(true);
-  const [showReviewsCard, setShowReviewsCard] = useState(false); // show reviews column to the right
+  const [showReviewsCard, setShowReviewsCard] = useState(false); 
 
-
-  // Chat-related state for Admin
-  const [adminUser, setAdminUser] = useState(null); // { id, name, email }
-  const [conversations, setConversations] = useState([]); // { peerId, peerName, lastMessage, lastAt }
+  const [adminUser, setAdminUser] = useState(null); 
+  const [conversations, setConversations] = useState([]); 
   const [loadingConversations, setLoadingConversations] = useState(false);
   const [selectedPeer, setSelectedPeer] = useState(null);
   const [selectedPeerName, setSelectedPeerName] = useState('');
 
-
+  const adminMenu = [
+    { key: "home", label: "Home", icon: <FaHome /> },
+    { key: "users", label: "Customers", icon: <FaUsers /> },
+    { key: "services", label: "Providers", icon: <FaTools /> },
+    { key: "verification", label: "Verification", icon: <FaCheck /> },
+    { key: "bookings", label: "Bookings", icon: <FaCalendarAlt /> },
+    { key: "complaints", label: "Complaints", icon: <FaExclamationTriangle /> },
+    { key: "chat", label: "Messages", icon: <FaFacebookMessenger /> },
+  ];
+  
+  
   // document-related state
-  const [documentsCache, setDocumentsCache] = useState(null); // cached metadata from /users/documents
-  const [docModalUrl, setDocModalUrl] = useState(null); // blob URL when using modal fallback
+  const [documentsCache, setDocumentsCache] = useState(null); 
+  const [docModalUrl, setDocModalUrl] = useState(null); 
   const [docModalOpen, setDocModalOpen] = useState(false);
   const [docLoading, setDocLoading] = useState(false);
-  // timeframe for service analytics: 'this_month' | 'last_3' | 'last_6' | 'custom'
-  const [serviceTimeframe, setServiceTimeframe] = useState('last_3');
-  const [serviceCustomMonth, setServiceCustomMonth] = useState('');
-  const [providerTimeframe, setProviderTimeframe] = useState('last_3');
-  const [providerCustomMonth, setProviderCustomMonth] = useState('');
-  // location filter for location trends: 'state' | 'city' | 'district'
-  const [locationFilter, setLocationFilter] = useState('state');
-  // timeframe for total bookings chart
-  const [bookingsTimeframe, setBookingsTimeframe] = useState('last_3');
-  const [bookingsCustomMonth, setBookingsCustomMonth] = useState('');
 
   useEffect(() => {
     const fetchProviders = async () => {
@@ -110,7 +68,6 @@ const AdminDashboard = () => {
     fetchProviders();
   }, []);
 
-  // Build a unified users list (customers + providers) for the dashboard users table
   useEffect(() => {
     const merged = [];
     if (Array.isArray(customers)) {
@@ -127,7 +84,6 @@ const AdminDashboard = () => {
 
     if (Array.isArray(providers)) {
       for (const p of providers) {
-        // providers may be a services list where nested provider object contains user info
         const providerObj = p.provider ?? p;
         merged.push({
           id: providerObj.id ?? providerObj._id ?? p.id ?? null,
@@ -155,13 +111,12 @@ const AdminDashboard = () => {
       setReports(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Error fetching reports:", err);
-      // keep whatever we have in state rather than wiping it aggressively
     }
   };
 
-  // call once on mount
+
   useEffect(() => {
-    loadReports().catch(err => { /* already logged in loadReports */ });
+    loadReports().catch(err => {  });
   }, []);
 
   useEffect(() => {
@@ -216,7 +171,6 @@ const AdminDashboard = () => {
   }, []);
 
 
-  // Get admin profile and store admin id (so chat endpoints can use it)
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) return;
@@ -238,7 +192,6 @@ const AdminDashboard = () => {
       });
   }, []);
 
-  // Load conversations for admin when Chat tab active
   useEffect(() => {
     const loadConversations = async () => {
       const token = localStorage.getItem('token');
@@ -272,10 +225,9 @@ const AdminDashboard = () => {
 
     if (activeTab === 'chat') {
       loadConversations();
-      // OPTIONAL: poll every 3s while on chat tab to get updates without sockets
       const interval = setInterval(() => {
         loadConversations().catch(() => {});
-      }, 3000);
+      }, 5000);
       return () => clearInterval(interval);
     }
   }, [activeTab, adminUser]);
@@ -305,8 +257,7 @@ const AdminDashboard = () => {
     const token = localStorage.getItem("token");
     setProcessingServiceId(serviceId);
 
-    // Adjust URL to your backend route if different
-    const url = `http://localhost:8087/service/${serviceId}/verify`; // or /service/{id}/verify
+    const url = `http://localhost:8087/service/${serviceId}/verify`; 
 
     try {
       console.log("updateProviderVerification: sending", { url, serviceId, newStatus });
@@ -327,7 +278,6 @@ const AdminDashboard = () => {
         return;
       }
 
-      // parse response if JSON returned
       let returned = null;
       try {
         returned = await res.json();
@@ -376,7 +326,6 @@ const AdminDashboard = () => {
   const [manageRefunds, setManageRefunds] = useState(false);
 
 
-  // filtered lists for report and refund tables
   const reportsOnly = useMemo(() => {
     if (!Array.isArray(reports)) return [];
     return reports.filter(r => String(r.category || '').trim().toUpperCase() === 'REPORT');
@@ -389,17 +338,14 @@ const AdminDashboard = () => {
 
 
   const openActionModal = (reportObj, type) => {
-    // type is 'accept' or 'reject'
     setActionTarget(reportObj);
     setActionType(type);
 
-    // For refunds, if admin clicks "approved" prefill the reply with the refund message and optionally make it readonly
     const category = String(reportObj?.category || '').toUpperCase();
     if (category === 'REFUND' && type === 'approved') {
       setActionReply('Refund has been initiated');
-      setActionReadOnly(true); // make readonly so admin doesn't accidentally change; set false if you want editable
+      setActionReadOnly(true); 
     } else {
-      // default: empty reply for admin to type
       setActionReply('');
       setActionReadOnly(false);
     }
@@ -415,7 +361,6 @@ const AdminDashboard = () => {
     setActionReadOnly(false);
   };
 
-  // Submit admin response: sets status and sends reply to backend
   const submitActionResponse = async () => {
     if (!actionTarget || !actionType) return;
     const newStatus = actionType === 'approved' ? 'APPROVED' : 'REJECTED';
@@ -427,7 +372,6 @@ const AdminDashboard = () => {
 
     setProcessingReportId(reportId);
 
-    // prepare payload
     const payload = {
       status: newStatus,
       reply: actionReply || (newStatus === 'APPROVED' && actionTarget.category === 'REFUND' ? 'Refund has been initiated' : '')
@@ -449,28 +393,21 @@ const AdminDashboard = () => {
         const text = await res.text().catch(() => '');
         console.error('Failed updating report status', res.status, text);
 
-        // Temporary heuristic: if backend returns 500 with message indicating update succeeded,
-        // we can still optimistically update — optional.
-        // Otherwise show error and return.
         alert(`Failed to update report: ${res.status} ${text || res.statusText}`);
         return;
       }
 
-      // Try parse updated object if server returned it
       let updated = null;
       try { updated = await res.json(); } catch (_) { updated = null; }
 
-      // Optimistically update local state immediately so UI changes without needing a reload
       setReports(prev => prev.map(r => {
         if (String(r.id) !== String(reportId)) return r;
         if (updated && typeof updated === 'object') return updated;
         return { ...r, status: newStatus, adminReply: payload.reply };
       }));
 
-      // close modal right away to give snappy UX
       closeActionModal();
 
-      // Refresh canonical data from server (ensures names/fields returned by server are applied)
       await loadReports();
 
     } catch (err) {
@@ -482,7 +419,6 @@ const AdminDashboard = () => {
   };
 
 
-  // Build reviews map for quick stats
   const reviewsMap = useMemo(() => {
     const map = {};
     if (!Array.isArray(reviews)) return map;
@@ -497,7 +433,6 @@ const AdminDashboard = () => {
     return map;
   }, [reviews]);
 
-  // reset reviews card when modal closed
   useEffect(() => {
     if (!selectedProvider) setShowReviewsCard(false);
   }, [selectedProvider]);
@@ -536,159 +471,6 @@ const AdminDashboard = () => {
     { value: pendingApprovalsCount, label: "Pending Approvals" },
   ], [customers, activeBookingsCount, verifiedProvidersCount, pendingApprovalsCount]);
 
-  // --- Chart data aggregations ---------------------------------------
-  // Small inline SVG pie chart component
-  const SmallPieChart = ({ data = [], size = 180, colors = [] }) => {
-    if (!Array.isArray(data) || data.length === 0) return <div style={{ color: '#888' }}>No data</div>;
-    const total = data.reduce((s, d) => s + (Number(d.value) || 0), 0);
-    if (total === 0) return <div style={{ color: '#888' }}>No data</div>;
-
-    const cx = size / 2;
-    const cy = size / 2;
-    const r = Math.min(cx, cy) - 4;
-    let angle = -Math.PI / 2; // start at top
-
-    const defaultColors = ['#6156f8', '#2b6cb0', '#48bb78', '#f6ad55', '#ed64a6', '#9f7aea'];
-
-    const slices = data.map((d, i) => {
-      const value = Number(d.value) || 0;
-      const frac = value / total;
-      const start = angle;
-      const end = angle + frac * Math.PI * 2;
-      angle = end;
-      const large = end - start > Math.PI ? 1 : 0;
-      const x1 = cx + r * Math.cos(start);
-      const y1 = cy + r * Math.sin(start);
-      const x2 = cx + r * Math.cos(end);
-      const y2 = cy + r * Math.sin(end);
-      const path = `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`;
-      return { path, color: colors[i] || defaultColors[i % defaultColors.length], label: d.label, value };
-    });
-
-    return (
-      <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-        <svg width={size} height={size} style={{ flex: '0 0 auto' }}>
-          {slices.map((s, i) => (
-            <path key={i} d={s.path} fill={s.color} stroke="#fff" strokeWidth={1} />
-          ))}
-        </svg>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {slices.map((s, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 120 }}>
-              <span style={{ width: 12, height: 12, background: s.color, display: 'inline-block', borderRadius: 3 }} />
-              <span style={{ fontSize: 13, color: '#333' }}>{s.label}</span>
-              <span style={{ marginLeft: 8, color: '#666' }}>({s.value})</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
-  // Helper: compute months range and labels for timeframe
-  const computeRange = (timeframe, customMonthVal) => {
-    const now = new Date();
-    let start = new Date(now.getFullYear(), now.getMonth(), 1);
-    let end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    if (timeframe === 'last_3') {
-      start = new Date(now.getFullYear(), now.getMonth() - 2, 1);
-      end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    } else if (timeframe === 'last_6') {
-      start = new Date(now.getFullYear(), now.getMonth() - 5, 1);
-      end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    } else if (timeframe === 'custom' && customMonthVal) {
-      const parts = customMonthVal.split('-');
-      if (parts.length === 2) {
-        const y = Number(parts[0]);
-        const m = Number(parts[1]) - 1;
-        if (!Number.isNaN(y) && !Number.isNaN(m)) {
-          start = new Date(y, m, 1);
-          end = new Date(y, m + 1, 1);
-        }
-      }
-    }
-    const months = [];
-    const cur = new Date(start.getFullYear(), start.getMonth(), 1);
-    while (cur < end) {
-      months.push(new Date(cur.getFullYear(), cur.getMonth(), 1));
-      cur.setMonth(cur.getMonth() + 1);
-    }
-    const monthLabels = months.map(d => d.toLocaleString(undefined, { month: 'short', year: 'numeric' }));
-    return { start, end, months, monthLabels };
-  };
-
-  // Helper: abbreviate large numbers (e.g. 1200 -> 1.2k)
-  const abbreviateNumber = (n) => {
-    const num = Number(n || 0);
-    if (isNaN(num)) return String(n);
-    const abs = Math.abs(num);
-    if (abs < 1000) return String(num);
-    const units = ['k', 'M', 'B', 'T'];
-    let value = num;
-    let idx = -1;
-    while (Math.abs(value) >= 1000 && idx < units.length - 1) {
-      value = value / 1000;
-      idx += 1;
-    }
-    return `${Number(value.toFixed(1))}${units[idx]}`;
-  };
-
-  // Month-wise stacked bar chart: months along X, stacked segments per service
-  const SmallMonthStackedBarChart = ({ services = [], monthLabels = [], valuesByMonth = [], colors = [] }) => {
-    if (!Array.isArray(valuesByMonth) || valuesByMonth.length === 0) return <div style={{ color: '#888' }}>No data</div>;
-    const defaultColors = ['#4f46e5', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
-    const monthTotals = valuesByMonth.map(arr => arr.reduce((a, b) => a + Number(b || 0), 0));
-    const max = Math.max(...monthTotals, 1);
-    const chartHeight = 160;
-    return (
-      <div>
-        {/* Chart area with totals above each month's stacked bar */}
-        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
-          {valuesByMonth.map((vals, mi) => (
-            <div key={mi} style={{ width: 56, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              {/* numeric total above the bar - hide if zero, show abbreviated with full value in title/aria */}
-              {Number(monthTotals[mi]) > 0 ? (
-                <div
-                  role="img"
-                  aria-label={`Total ${monthTotals[mi]} for ${monthLabels[mi]}`}
-                  title={`${monthTotals[mi]} total`}
-                  style={{ fontSize: 12, color: '#333', marginBottom: 6 }}
-                >
-                  {abbreviateNumber(monthTotals[mi])}
-                </div>
-              ) : (
-                <div style={{ height: 18 }} />
-              )}
-              {/* stacked bar area */}
-              <div
-                role="img"
-                aria-label={`${monthLabels[mi]} stacked bar, total ${monthTotals[mi]}`}
-                style={{ height: chartHeight, display: 'flex', flexDirection: 'column-reverse', width: '100%', borderRadius: 6, overflow: 'hidden', background: '#fff', boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.03)' }}
-              >
-                {vals.map((v, si) => {
-                  const h = Math.round((Number(v || 0) / max) * chartHeight);
-                  return <div key={si} title={`${services[si]}: ${v}`} style={{ height: h, background: colors[si] || defaultColors[si % defaultColors.length], width: '100%' }} />;
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
-        <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
-          {monthLabels.map((m, i) => (
-            <div key={i} style={{ width: 56, textAlign: 'center', fontSize: 12, color: '#333' }}>{m.split(' ')[0]}</div>
-          ))}
-        </div>
-        <div style={{ marginTop: 10, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          {services.map((s, i) => (
-            <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <span style={{ width: 12, height: 12, background: colors[i] || defaultColors[i % defaultColors.length], display: 'inline-block', borderRadius: 3 }} />
-              <div style={{ fontSize: 13, color: '#333' }}>{s}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
 
   const topServices = useMemo(() => {
     if (!Array.isArray(bookings)) return [];
@@ -702,54 +484,7 @@ const AdminDashboard = () => {
     return arr.slice(0, 6);
   }, [bookings]);
 
-  
 
-  const topProviders = useMemo(() => {
-    if (!Array.isArray(bookings)) return [];
-    const map = {};
-    for (const b of bookings) {
-      const pname = (b.provider && (b.provider.name || b.provider.fullName)) || (b.providerName) || 'Unknown';
-      map[pname] = (map[pname] || 0) + 1;
-    }
-    const arr = Object.entries(map).map(([label, value]) => ({ label, value }));
-    arr.sort((a, b) => b.value - a.value);
-    return arr.slice(0, 6);
-  }, [bookings]);
-
-  // Helper: extract location component (state, city, or district) from location string
-  // Assumes format like "City, District, State" or "City, State"
-  const extractLocationComponent = (location, component) => {
-    if (!location || typeof location !== 'string') return 'Unknown';
-    const parts = location.split(',').map(p => p.trim()).filter(p => p);
-    
-    if (component === 'state') {
-      // state is typically the last part
-      return parts.length > 0 ? parts[parts.length - 1] : 'Unknown';
-    } else if (component === 'city') {
-      // city is typically the first part
-      return parts.length > 0 ? parts[0] : 'Unknown';
-    } else if (component === 'district') {
-      // district is typically the middle part (if 3+ parts exist)
-      return parts.length > 2 ? parts[1] : (parts.length > 1 ? parts[1] : 'Unknown');
-    }
-    return 'Unknown';
-  };
-
-  const locationTrends = useMemo(() => {
-    if (!Array.isArray(bookings)) return [];
-    const map = {};
-    for (const b of bookings) {
-      const loc = (b.customer && (b.customer.location || b.customer.customerLocation)) || b.location || 'Unknown';
-      const component = extractLocationComponent(loc, locationFilter);
-      map[component] = (map[component] || 0) + 1;
-    }
-    const arr = Object.entries(map).map(([label, value]) => ({ label, value }));
-    arr.sort((a, b) => b.value - a.value);
-    return arr.slice(0, 6);
-  }, [bookings, locationFilter]);
-  // --------------------------------------------------------------------
-
-  // only approved providers for Services tab
   const approvedProviders = useMemo(() => {
     if (!Array.isArray(providers)) return [];
     return providers.filter(p => String(p.verified ?? "").toLowerCase() === "approved");
@@ -767,24 +502,21 @@ const AdminDashboard = () => {
     setProviders((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // put with other imports/hooks near top of component
   const providersSorted = React.useMemo(() => {
     if (!Array.isArray(providers)) return [];
 
     const rank = (p) => {
       const v = String(p?.verified ?? "").toLowerCase();
-      if (v === "pending") return 0;    // highest priority -> show first
+      if (v === "pending") return 0;   
       if (v === "approved") return 1;
       if (v === "rejected") return 2;
-      return 3; // unknown / other last
+      return 3; 
     };
 
-    // stable sort: include original index so equal-rank items keep original order
     return providers
       .map((p, idx) => ({ p, idx, r: rank(p) }))
       .sort((a, b) => {
         if (a.r !== b.r) return a.r - b.r;
-        // tie-breaker: provider name (safe fallback to empty string)
         const nameA = String(a.p?.provider?.name ?? a.p?.name ?? "").toLowerCase();
         const nameB = String(b.p?.provider?.name ?? b.p?.name ?? "").toLowerCase();
         if (nameA < nameB) return -1;
@@ -794,8 +526,7 @@ const AdminDashboard = () => {
       .map(x => x.p);
   }, [providers]);
 
-  // --- Document logic --------------------------------------------------
-  // Fetch and cache documents metadata (lazy load)
+  // --- Document logic ---
   const fetchDocumentsMetadata = async () => {
     if (documentsCache) return documentsCache;
     try {
@@ -810,8 +541,6 @@ const AdminDashboard = () => {
     }
   };
 
-  // Try to open the document in a new tab using stream endpoint.
-  // If that fails (CORS or 404), fallback to fetching as blob and showing in modal.
   const handleSeeDocument = async (provider) => {
     const providerId = getProviderId(provider);
     if (!providerId) {
@@ -835,15 +564,12 @@ const AdminDashboard = () => {
       }
 
       const openUrl = `http://localhost:8087/users/document/${encodeURIComponent(match.document_id)}`;
-      // Preferred: open in new tab so browser displays PDF inline.
       const newTab = window.open(openUrl, "_blank");
       if (newTab) {
-        // successfully opened; leave it to browser to render
         setDocLoading(false);
         return;
       }
 
-      // Fallback: fetch as blob and show inside modal (CORS must allow this)
       try {
         const r = await fetch(openUrl);
         if (!r.ok) {
@@ -869,69 +595,18 @@ const AdminDashboard = () => {
       setDocModalUrl(null);
     }
   };
-  // ---------------------------------------------------------------------
 
-  const CustomerCard = ({ customers }) => (
-    <div className="modal-left">
-      <div className="card-profile">
-        <FaUserCircle color="#fdfdfd" size={80} />
-      </div>
-      <h2 className="modal-provider-name-left">{customers.name}</h2>
-      <div className="modal-left-info">
-        <div className="modal-contact-row">
-          <p>
-            Contact: <span className="modal-detail-value">{customers.phno}</span>
-          </p>
-          <p>
-            <FaEnvelope />
-            <span className="modal-detail-value">{customers.email}</span>
-          </p>
-        </div>
-        <p className="modal-location-row">
-          <FaMapMarkerAlt color="#cf1616ff" className="modal-map-icon" />
-          Location:
-        </p>
-        <p className="modal-detail-value-left">{customers.location}</p>
-      </div>
-    </div>
-  );
 
   return (
     <div className="dashboard admin-theme">
       {/* Sidebar */}
-      <aside className="sidebar">
-        <h2 className="logo">FixItNow</h2>
-        <div className="sidebar-title">FixItNow</div>
-        
-        <ul>
-          <li className={activeTab === "home" ? "active" : ""} onClick={() => setActiveTab("home")}>
-            <FaHome /> Home
-          </li>
-          <li className={activeTab === "users" ? "active" : ""} onClick={() => setActiveTab("users")}>
-            <FaUsers /> Customers
-          </li>
-          <li className={activeTab === "services" ? "active" : ""} onClick={() => setActiveTab("services")}>
-            <FaTools /> Providers
-          </li>
-          <li className={activeTab === "verification" ? "active" : ""} onClick={() => setActiveTab("verification")}>
-            <FaCheck /> Verification
-          </li>
-          <li className={activeTab === "bookings" ? "active" : ""} onClick={() => setActiveTab("bookings")}>
-            <FaCalendarAlt /> Bookings
-          </li>
-          <li className={activeTab === "complaints" ? "active" : ""} onClick={() => setActiveTab("complaints")}>
-            <FaExclamationTriangle /> Complaints
-          </li>
-          <li className={activeTab === "chat" ? "active" : ""} onClick={() => setActiveTab("chat")}>
-            <FaFacebookMessenger /> Messages
-          </li>
-        </ul>
-        <div className="sidebar-bottom">
-          <button className="logout-button" onClick={handleLogout}>
-            <FaSignOutAlt /> Logout
-          </button>
-        </div>
-      </aside>
+      <Sidebar
+        activeTab={activeTab}
+        onActivate={(k) => setActiveTab(k)}
+        menu={adminMenu}        
+        showLogoOnCollapsed={true}
+        handleLogout={() => {handleLogout()}}
+      />
 
       {/* Main Content */}
       <main className="main">
@@ -1130,13 +805,11 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        {/* combined modal: provider details on left, reviews panel on right (renders when showReviewsCard true) */}
         {selectedProvider && (
           <div className="a-modal-overlay" onClick={() => { setSelectedProvider(null); }}>
             <div className="a-modal-content a-modal-inner" onClick={e => e.stopPropagation()}>
               <button className="a-modal-close-btn" onClick={() => { setSelectedProvider(null); setShowReviewsCard(false); }}>×</button>
 
-              {/* LEFT - provider details (kept original style) */}
               <div className="a-modal-left provider-card-original">
                 <div className="a-card-profile">
                     <p>
@@ -1176,7 +849,6 @@ const AdminDashboard = () => {
                 <p className="a-modal-detail-value-left">{selectedProvider?.location}</p>
               </div>
 
-              {/* RIGHT - reviews (only rendered when showReviewsCard true) */}
               {showReviewsCard && (
                 <div>
                   <Reviews
