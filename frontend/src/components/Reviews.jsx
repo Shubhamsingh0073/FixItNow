@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import "./Reviews.css";
 import { FaArrowLeft, FaStar } from "react-icons/fa";
 
+export const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:8087";
+
 const Reviews = ({ provider, onBack, bookingId, showAddButton = true }) => {
   // Add review state
   const [showAddReview, setShowAddReview] = useState(false);
@@ -16,7 +18,7 @@ const Reviews = ({ provider, onBack, bookingId, showAddButton = true }) => {
   useEffect(() => {
     const fetchReviews = async () => {
       try {
-        const response = await fetch("http://localhost:8087/reviews/all");
+        const response = await fetch(`${API_BASE}/reviews/all`);
         if (!response.ok) throw new Error("Error fetching reviews");
         const data = await response.json();
         setReviews(data); // All reviews from backend
@@ -45,7 +47,7 @@ const Reviews = ({ provider, onBack, bookingId, showAddButton = true }) => {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch("http://localhost:8087/reviews/create", {
+      const response = await fetch(`${API_BASE}/reviews/create`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

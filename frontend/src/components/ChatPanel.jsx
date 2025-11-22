@@ -1,15 +1,9 @@
 import React, { useState, useRef, useEffect } from "react";
 import "./ChatPanel.css";
 
-// WebSocket base URL - dynamically determine if we're using HTTPS or not
 const WS_BASE = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.hostname}:8087/ws/chat`;
+export const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:8087";
 
-/**
- * Returns a stable string id for many possible shapes:
- * - string or number -> string
- * - object { id, _id, userId, user_id } -> the first available id as string
- * - null/undefined -> ''
- */
 function normalizeId(raw) {
   if (raw == null) return "";
   if (typeof raw === "string") return raw;
@@ -153,7 +147,7 @@ const ChatPanel = ({ currentUserId, peerId, peerName = "Peer", onBack }) => {
       return;
     }
 
-    const histUrl = `http://localhost:8087/api/chat/history?userA=${encodeURIComponent(uid)}&userB=${encodeURIComponent(peerId)}`;
+    const histUrl = `${API_BASE}/api/chat/history?userA=${encodeURIComponent(uid)}&userB=${encodeURIComponent(peerId)}`;
     console.log("[ChatPanel] fetching history", histUrl);
     fetch(histUrl, {
       headers: token ? { Authorization: `Bearer ${token}` } : undefined,

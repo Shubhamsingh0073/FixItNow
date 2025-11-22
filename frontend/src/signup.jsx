@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { FaUser, FaEnvelope, FaLock, FaEye, FaEyeSlash } from 'react-icons/fa';
 import './modern-auth.css';
 
+export const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:8087";
+
 const SignUpPage = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
@@ -95,17 +97,13 @@ const SignUpPage = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  // Replace the existing handleSubmit with this version and add the helper uploadDocument below it.
 
   const uploadDocument = async (providerId, file) => {
     const fd = new FormData();
     fd.append('file', file); // backend expects part name "file"
-    const res = await fetch(`http://localhost:8087/users/${providerId}/document`, {
+    const res = await fetch(`${API_BASE}/users/${providerId}/document`, {
       method: 'POST',
-      // do NOT set Content-Type header
       body: fd
-      // optionally include Authorization header if your endpoint requires auth:
-      // headers: { Authorization: `Bearer ${token}` }
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({ message: 'Upload failed' }));
@@ -121,7 +119,7 @@ const SignUpPage = () => {
 
     try {
       // Always send JSON to signup endpoint (two-step flow)
-      const signupResp = await fetch('http://localhost:8087/users/signup', {
+      const signupResp = await fetch(`${API_BASE}/users/signup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -4,6 +4,8 @@ import {
   PieChart,  Pie,  Cell,  LineChart,  Line,  Tooltip,} from "recharts";
 import "./AdminCharts.css";
 
+export const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:8087";
+
 const FIXED_CATEGORIES = [
   "Plumbing",  "Electrical",  "Carpentry",  "Cleaning",  "Appliance Repair",
 ];
@@ -125,7 +127,7 @@ useEffect(() => {
   let mounted = true;
   (async () => {
     try {
-      const res = await fetch("http://localhost:8087/users/locations");
+      const res = await fetch(`${API_BASE}/users/locations`);
       if (!res.ok) throw new Error("Failed to fetch locations");
       const data = await res.json();
       if (mounted && Array.isArray(data)) setLocationList(data);

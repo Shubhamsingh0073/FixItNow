@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { FaUser, FaEnvelope, FaLock, FaEye, FaEyeSlash } from 'react-icons/fa';
 import './modern-auth.css';
 
+export const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:8087";
+
 const roleLabels = {
   customer: 'Customer',
   provider: 'Service Provider',
@@ -82,7 +84,7 @@ const Login = () => {
     setErrors({});
 
     try {
-      const response = await fetch('http://localhost:8087/users/signin', {
+      const response = await fetch(`${API_BASE}/users/signin`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

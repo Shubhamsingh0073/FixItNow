@@ -4,9 +4,7 @@ import "./ProviderModal.css";
 import ExternalChatPanel from "./ChatPanel";
 import Reviews from "./Reviews";
 
-// Use ExternalChatPanel (imported above) for chat UI and WebSocket connection.
-// ProviderModal will render <ExternalChatPanel currentUserId={customerId} peerId={provider.id} /> when rightPanel==='chat'.
-
+export const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:8087";
 
 function formatForInput(date) {
   const pad = (n) => String(n).padStart(2, "0");
@@ -113,7 +111,7 @@ const ProviderModal = ({
     };
 
     try {
-      const response = await fetch("http://localhost:8087/bookings/create", {
+      const response = await fetch(`${API_BASE}/bookings/create`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -173,7 +171,7 @@ const ProviderModal = ({
     if (rightPanel === 'booking' || rightPanel === 'reviews') {
       const fetchReviews = async () => {
         try {
-          const response = await fetch("http://localhost:8087/reviews/all");
+          const response = await fetch(`${API_BASE}/reviews/all`);
           if (!response.ok) throw new Error("Error fetching reviews");
           const data = await response.json();
           setAllReviews(data);

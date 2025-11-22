@@ -5,8 +5,8 @@ import CustomerWideCard from './CustomerWideCard';
 import ChatPanel from './ChatPanel';
 import Sidebar from "./Sidebar"
 
+export const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:8087";
 
-// Mock provider profile
 const initialProvider = {
   rating: 4.6,
   reviews: [
@@ -81,7 +81,7 @@ const ProviderDashboard = () => {
       return;
     }
     try {
-      const response = await fetch('http://localhost:8087/users/me/phone', {
+      const response = await fetch(`${API_BASE}/users/me/phone`, {
         method: 'PUT', // or 'POST' if your backend expects it
         headers: {
           'Content-Type': 'application/json',
@@ -104,7 +104,7 @@ const ProviderDashboard = () => {
       return;
     }
     try {
-      const response = await fetch('http://localhost:8087/service/me', {
+      const response = await fetch(`${API_BASE}/service/me`, {
         method: 'PUT', // or 'POST' if your backend expects it
         headers: {
           'Content-Type': 'application/json',
@@ -143,7 +143,7 @@ const ProviderDashboard = () => {
     };
 
     try {
-      const response = await fetch('http://localhost:8087/service/me', {
+      const response = await fetch(`${API_BASE}/service/me`, {
         method: 'PUT', // or POST if your backend expects it
         headers: {
           'Content-Type': 'application/json',
@@ -168,7 +168,7 @@ const ProviderDashboard = () => {
       return;
     }
     try {
-      const response = await fetch('http://localhost:8087/users/me/location', {
+      const response = await fetch(`${API_BASE}/users/me/location`, {
         method: 'PUT', // or POST if your backend expects it
         headers: {
           'Content-Type': 'application/json',
@@ -191,7 +191,7 @@ const ProviderDashboard = () => {
       return;
     }
     try {
-      const response = await fetch(`http://localhost:8087/bookings/status`, {
+      const response = await fetch(`${API_BASE}/bookings/status`, {
         method: 'POST', 
         headers: {
           'Content-Type': 'application/json',
@@ -219,7 +219,7 @@ const ProviderDashboard = () => {
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) return;
-    fetch('http://localhost:8087/bookings/provider/me', {
+    fetch(`${API_BASE}/bookings/provider/me`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -237,12 +237,6 @@ const ProviderDashboard = () => {
   }, []);
 
 
-  // Get user data from localStorage
-  // --- Replace your existing "Get user data from localStorage" useEffect and the "Load conversations" useEffect with the block below ---
-
-  // --- Replace your existing users/me and conversation useEffects with the following ---
-
-// Get user data from backend and store userId in state + localStorage
 useEffect(() => {
   const token = localStorage.getItem('token');
   if (!token) {
@@ -251,7 +245,7 @@ useEffect(() => {
   }
 
   // fetch profile
-  fetch('http://localhost:8087/users/me', {
+  fetch(`${API_BASE}/users/me`, {
     method: 'GET',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -272,7 +266,7 @@ useEffect(() => {
     });
 
   // fetch service/me once
-  fetch('http://localhost:8087/service/me', {
+  fetch(`${API_BASE}/service/me`, {
     method: 'GET',
     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
   })
@@ -302,7 +296,7 @@ useEffect(() => {
 
     setLoadingConversations(true);
     try {
-      const url = `http://localhost:8087/api/chat/conversations?userId=${encodeURIComponent(providerId)}`;
+      const url = `${API_BASE}/api/chat/conversations?userId=${encodeURIComponent(providerId)}`;
       console.log('Fetching conversations:', url);
       const res = await fetch(url, {
         headers: {

@@ -11,6 +11,7 @@ import ChatPanel from "./ChatPanel";
 import AdminCharts from "./AdminCharts";
 import Sidebar from "./Sidebar"
 
+export const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:8087";
 
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState("home");
@@ -56,7 +57,7 @@ const AdminDashboard = () => {
   useEffect(() => {
     const fetchProviders = async () => {
       try {
-        const response = await fetch("http://localhost:8087/service");
+        const response = await fetch(`${API_BASE}/service`);
         if (!response.ok) throw new Error("Failed to fetch providers");
         const data = await response.json();
         setProviders(data);
@@ -100,7 +101,7 @@ const AdminDashboard = () => {
 
   const loadReports = async () => {
     try {
-      const res = await fetch("http://localhost:8087/api/reports", {
+      const res = await fetch(`${API_BASE}/api/reports`, {
         headers: { "Content-Type": "application/json" }
       });
       if (!res.ok) {
@@ -122,7 +123,7 @@ const AdminDashboard = () => {
   useEffect(() => {
     const fetchCustomers = async () => {
       try {
-        const response = await fetch("http://localhost:8087/users/customers");
+        const response = await fetch(`${API_BASE}/users/customers`);
         if (!response.ok) throw new Error("Failed to fetch customers");
         const data = await response.json();
         setCustomers(data);
@@ -138,7 +139,7 @@ const AdminDashboard = () => {
   useEffect(() => {
     const fetchBookings = async () => {
       try {
-        const response = await fetch("http://localhost:8087/bookings/all");
+        const response = await fetch(`${API_BASE}/bookings/all`);
         if (!response.ok) throw new Error("Failed to fetch bookings");
         const data = await response.json();
         setBookings(data);
@@ -156,7 +157,7 @@ const AdminDashboard = () => {
     const fetchReviews = async () => {
       setLoadingReviews(true);
       try {
-        const response = await fetch("http://localhost:8087/reviews/all");
+        const response = await fetch(`${API_BASE}/reviews/all`);
         if (!response.ok) throw new Error("Failed to fetch reviews");
         const data = await response.json();
         setReviews(data);
@@ -175,7 +176,7 @@ const AdminDashboard = () => {
     const token = localStorage.getItem('token');
     if (!token) return;
 
-    fetch('http://localhost:8087/users/me', {
+    fetch(`${API_BASE}/users/me`, {
       method: 'GET',
       headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
     })
@@ -199,7 +200,7 @@ const AdminDashboard = () => {
       if (!userId) return;
       setLoadingConversations(true);
       try {
-        const url = `http://localhost:8087/api/chat/conversations?userId=${encodeURIComponent(userId)}`;
+        const url = `${API_BASE}/api/chat/conversations?userId=${encodeURIComponent(userId)}`;
         const res = await fetch(url, {
           headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
         });
@@ -257,7 +258,7 @@ const AdminDashboard = () => {
     const token = localStorage.getItem("token");
     setProcessingServiceId(serviceId);
 
-    const url = `http://localhost:8087/service/${serviceId}/verify`; 
+    const url = `${API_BASE}/service/${serviceId}/verify`; 
 
     try {
       console.log("updateProviderVerification: sending", { url, serviceId, newStatus });
@@ -379,7 +380,7 @@ const AdminDashboard = () => {
 
     try {
       const token = localStorage.getItem('token');
-      const url = `http://localhost:8087/api/reports/${encodeURIComponent(reportId)}`;
+      const url = `${API_BASE}/api/reports/${encodeURIComponent(reportId)}`;
       const res = await fetch(url, {
         method: 'PUT',
         headers: {
@@ -530,7 +531,7 @@ const AdminDashboard = () => {
   const fetchDocumentsMetadata = async () => {
     if (documentsCache) return documentsCache;
     try {
-      const res = await fetch("http://localhost:8087/users/documents");
+      const res = await fetch(`${API_BASE}/users/documents`);
       if (!res.ok) throw new Error("Failed to fetch documents");
       const data = await res.json();
       setDocumentsCache(data);
@@ -563,7 +564,7 @@ const AdminDashboard = () => {
         return;
       }
 
-      const openUrl = `http://localhost:8087/users/document/${encodeURIComponent(match.document_id)}`;
+      const openUrl = `${API_BASE}/users/document/${encodeURIComponent(match.document_id)}`;
       const newTab = window.open(openUrl, "_blank");
       if (newTab) {
         setDocLoading(false);

@@ -8,7 +8,6 @@ const AdminVerification = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Get email from route state (passed from SignUp)
   const email = location.state?.email || 'your-email@gmail.com';
 
   const handleSubmit = async (e) => {
@@ -18,7 +17,6 @@ const AdminVerification = () => {
       return;
     }
 
-    // Backend code verification can be added here
     alert('Admin verified!');
     navigate('/login');
   };

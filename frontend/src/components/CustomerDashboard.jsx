@@ -12,6 +12,7 @@ import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 
+export const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:8087";
 
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -86,7 +87,7 @@ const CustomerDashboard = () => {
   useEffect(() => {
     const fetchProviders = async () => {
       try {
-        const res = await fetch('http://localhost:8087/users/providers');
+        const res = await fetch(`${API_BASE}/users/providers`);
         if (!res.ok) throw new Error('Failed to fetch providers');
         const providers = await res.json();
         const providersArray = Array.isArray(providers) ? providers : [providers];
@@ -144,7 +145,7 @@ const CustomerDashboard = () => {
     const token = localStorage.getItem('token');
     if (!token) return;
 
-    fetch('http://localhost:8087/bookings/customer/me', {
+    fetch(`${API_BASE}/bookings/customer/me`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -168,7 +169,7 @@ const CustomerDashboard = () => {
       console.error('No token found. Please login.');
       return;
     }
-    fetch('http://localhost:8087/users/me', {
+    fetch(`${API_BASE}/users/me`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -202,7 +203,7 @@ const CustomerDashboard = () => {
   useEffect(() => {
     async function fetchAndGeocodeProviders() {
       try {
-        const res = await fetch('http://localhost:8087/users/providers');
+        const res = await fetch(`${API_BASE}/users/providers`);
         const providers = await res.json();
         const providersArray = Array.isArray(providers) ? providers : [providers];
 
@@ -253,7 +254,7 @@ const CustomerDashboard = () => {
       setReportsError(null);
 
       try {
-        const res = await fetch('http://localhost:8087/api/reports/customer', {
+        const res = await fetch(`${API_BASE}/api/reports/customer`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -389,7 +390,7 @@ const CustomerDashboard = () => {
 
     setReportSubmitting(true);
     try {
-      const url = 'http://localhost:8087/api/reports'; 
+      const url = `${API_BASE}/api/reports`; 
       const token = localStorage.getItem('token');
       const payload = {
         reportedById: reporterId,
@@ -444,7 +445,7 @@ const CustomerDashboard = () => {
 
       setLoadingConversations(true);
       try {
-        const url = `http://localhost:8087/api/chat/conversations?userId=${encodeURIComponent(customerId)}`;
+        const url = `${API_BASE}/api/chat/conversations?userId=${encodeURIComponent(customerId)}`;
         const res = await fetch(url, {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -545,7 +546,7 @@ const handleConnect = (provider, bookingDate, selectedServicesFromModal, selecte
       return;
     }
     try {
-      const response = await fetch('http://localhost:8087/users/me/phone', {
+      const response = await fetch(`${API_BASE}/users/me/phone`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -574,7 +575,7 @@ const handleConnect = (provider, bookingDate, selectedServicesFromModal, selecte
       return;
     }
     try {
-      const response = await fetch('http://localhost:8087/users/me/location', {
+      const response = await fetch(`${API_BASE}/users/me/location`, {
         method: 'PUT', // or POST if your backend expects it
         headers: {
           'Content-Type': 'application/json',

@@ -3,6 +3,8 @@ import { FaEnvelope, FaLock, FaEye, FaEyeSlash } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import './modern-auth.css';
 
+export const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:8087";
+
 const ForgotPassword = () => {
   const [email, setEmail] = useState('');
   const [phase, setPhase] = useState('check'); // 'check' | 'reset' | 'done'
@@ -25,7 +27,7 @@ const ForgotPassword = () => {
     }
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:8087/users/forgot/check`, {
+      const res = await fetch(`${API_BASE}/users/forgot/check`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim().toLowerCase() }),
@@ -63,7 +65,7 @@ const ForgotPassword = () => {
 
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:8087/users/forgot/reset`, {
+      const res = await fetch(`${API_BASE}/users/forgot/reset`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
