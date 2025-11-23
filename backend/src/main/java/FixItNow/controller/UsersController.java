@@ -43,7 +43,7 @@ import FixItNow.model.Users;
 import FixItNow.repository.ServicesRepository;
 import FixItNow.repository.UsersRepository;
 
-@CrossOrigin(origins = "*")
+
 
 
 @RestController

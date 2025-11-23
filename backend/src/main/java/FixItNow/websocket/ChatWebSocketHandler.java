@@ -17,14 +17,6 @@ import FixItNow.model.Message;
 
 import java.util.Map;
 
-/**
- * JWT-authenticated WebSocket handler.
- * The JwtHandshakeInterceptor authenticates the token and sets "userId" in session attributes.
- * Client must pass token during connection (query param ?token=... or Authorization header).
- *
- * Incoming payload expected JSON: { "to": "<userId>", "content": "..." }
- * The server will determine the sender as the authenticated user in the session attributes.
- */
 @Component
 public class ChatWebSocketHandler extends TextWebSocketHandler {
 

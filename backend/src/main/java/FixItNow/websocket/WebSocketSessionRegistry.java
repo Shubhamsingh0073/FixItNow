@@ -7,10 +7,7 @@ import java.util.concurrent.ConcurrentMap;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.WebSocketSession;
 
-/**
- * Registry mapping userId -> WebSocketSession.
- * Provides removeBySession to cleanup on connection closed.
- */
+
 @Component
 public class WebSocketSessionRegistry {
     private final ConcurrentMap<String, WebSocketSession> sessions = new ConcurrentHashMap<>();

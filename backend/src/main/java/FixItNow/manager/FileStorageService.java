@@ -34,12 +34,7 @@ public class FileStorageService {
         }
     }
 
-    /**
-     * Store the incoming multipart file under optional subfolder and a generated filename.
-     * Returns the absolute path to the stored file.
-     *
-     * Throws RuntimeException on validation/storage errors.
-     */
+   
     public String store(MultipartFile file, String subfolder, String prefix) {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("No file provided");

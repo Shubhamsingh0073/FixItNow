@@ -15,10 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import FixItNow.manager.UsersManager;
 import FixItNow.model.Users;
 
-/**
- * Handshake interceptor that validates a JWT token (query param 'token' or 'Authorization' header).
- * On success puts "userId" attribute into the WebSocket session attributes.
- */
+
 @Component
 public class JwtHandshakeInterceptor implements HandshakeInterceptor {
 

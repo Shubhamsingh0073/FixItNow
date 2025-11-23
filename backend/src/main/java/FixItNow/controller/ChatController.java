@@ -17,8 +17,6 @@ import FixItNow.model.ConversationSummary;
 import FixItNow.repository.MessageRepository;
 
 
-@CrossOrigin(origins = "*")
-
 @RestController
 public class ChatController {
 
