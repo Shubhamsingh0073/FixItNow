@@ -685,7 +685,7 @@ const handleConnect = (provider, bookingDate, selectedServicesFromModal, selecte
         <h3><b>{provider.name}</b></h3>
         <div className="rating">
           <FaStar className="star-icon" />
-          {provider.rating ? provider.rating : "4.5"} ({provider.reviews ? provider.reviews : "120"} reviews)
+          {provider.rating ? provider.rating : "4.5"} ({provider.reviews ? provider.reviews : "1"} reviews)
         </div>
         <p className="category-info"><FaToolbox /> <b>{provider.category}</b></p>
         <p className="distance">

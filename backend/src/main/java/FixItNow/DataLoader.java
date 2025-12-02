@@ -25,10 +25,10 @@ public class DataLoader implements CommandLineRunner {
     @Override
     public void run(String... args) throws Exception {
         // CUSTOMER
-        if (!userRepository.existsByEmail("alice@example.com")) {
+        if (!userRepository.existsByEmail("alice@gmail.com")) {
             Users alice = new Users();
             alice.setId(usersManager.generateNextUserId());
-            alice.setEmail("alice@example.com");
+            alice.setEmail("alice@gmail.com");
             alice.setPassword("password1234");
             alice.setName("Alice Smith");
             alice.setRole(UserRole.CUSTOMER);
@@ -39,12 +39,12 @@ public class DataLoader implements CommandLineRunner {
         }
 
         // PROVIDER
-        if (!userRepository.existsByEmail("provider@example.com")) {
+        if (!userRepository.existsByEmail("ramu@gmail.com")) {
             Users provider = new Users();
             provider.setId(usersManager.generateNextUserId());
-            provider.setEmail("provider@example.com");
+            provider.setEmail("ramu@gmail.com");
             provider.setPassword("password123");
-            provider.setName("Provider");
+            provider.setName("Ramu Electricals");
             provider.setRole(UserRole.PROVIDER);
             Users savedProvider = userRepository.save(provider); 
             System.out.println("Sample user 'provider' created.");

@@ -163,7 +163,7 @@ const SignUpPage = () => {
       if (formData.role === 'ADMIN') {
         navigate('/admin-verify', { state: { email: formData.email } });
       } else {
-        alert('Registration successful! Please login to continue.');
+        alert('Registration successful! Please wait for admin to verify.');
         navigate('/login');
       }
     } catch (error) {
