@@ -141,7 +141,6 @@ const AdminCharts = ({ bookings = [], providers = [] }) => {
 
   const [locLevel, setLocLevel] = useState("state");
 
-  // ----- Improved normalization and city/state extraction using authoritative lists -----
 
   const normalize = (s) => {
     if (!s && s !== "") return "";
@@ -156,8 +155,6 @@ const AdminCharts = ({ bookings = [], providers = [] }) => {
     }
   };
 
-  // Authoritative lists for India (states + common capitals / major cities).
-  // Extend these arrays if you want more city names or alternate spellings.
   const INDIAN_STATES_RAW = [
     "Andhra Pradesh","Arunachal Pradesh","Assam","Bihar","Chhattisgarh","Goa",
     "Gujarat","Haryana","Himachal Pradesh","Jharkhand","Karnataka","Kerala",
@@ -176,7 +173,6 @@ const AdminCharts = ({ bookings = [], providers = [] }) => {
     "Indore","Nagpur","Rajkot","Jodhpur","Madurai","Tiruchirappalli","Mysore","Mysuru","Kalyan","Thane","Nashik"
   ];
 
-  // build normalized lookup arrays sorted by descending key length (prefer longest matches)
   const INDIAN_STATES = INDIAN_STATES_RAW
     .map(name => ({ name, key: normalize(name) }))
     .sort((a,b) => b.key.length - a.key.length);
@@ -185,12 +181,7 @@ const AdminCharts = ({ bookings = [], providers = [] }) => {
     .map(name => ({ name, key: normalize(name) }))
     .sort((a,b) => b.key.length - a.key.length);
 
-  /**
-   * extractCityState - improved lookup using known city/state lists
-   * - returns { city, state }
-   * - tries to find a city/name or state inside the normalized location string
-   * - falls back to comma-splitting if no match found
-   */
+
   const extractCityState = (locStr) => {
     let fallbackCity = "Unknown";
     let fallbackState = "Unknown";
@@ -204,12 +195,10 @@ const AdminCharts = ({ bookings = [], providers = [] }) => {
 
     const norm = normalize(raw);
 
-    // 1) Try to match a known city (longest-first)
     for (const c of INDIAN_CITIES) {
       if (!c.key) continue;
       if (norm.includes(c.key)) {
         const detectedCity = c.name;
-        // attempt to find state as well
         for (const s of INDIAN_STATES) {
           if (!s.key) continue;
           if (norm.includes(s.key)) {
@@ -220,7 +209,6 @@ const AdminCharts = ({ bookings = [], providers = [] }) => {
       }
     }
 
-    // 2) If no city matched, try to match a state anywhere
     for (const s of INDIAN_STATES) {
       if (!s.key) continue;
       if (norm.includes(s.key)) {
@@ -232,11 +220,9 @@ const AdminCharts = ({ bookings = [], providers = [] }) => {
       }
     }
 
-    // 3) Fallback: use comma-splitting (first part = city, last part = state)
     return { city: fallbackCity || "Unknown", state: fallbackState || "Unknown" };
   };
 
-  //split location into city/state
   const locationEntries = useMemo(() => {
     if (!Array.isArray(locationList)) return [];
     return locationList.map((item) => {
