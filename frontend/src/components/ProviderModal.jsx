@@ -67,6 +67,7 @@ const ProviderModal = ({
   handleConnect,
   booking = null,
   viewingBooking = false,
+  addToCart,
 }) => {
   const scrollRef = useRef();
   const [selectedDate, setSelectedDate] = useState("");
@@ -85,7 +86,7 @@ const ProviderModal = ({
   const [slotError, setSlotError] = useState("");
 
   // rightPanel: booking, reviews, chat
-  const [rightPanel, setRightPanel] = useState('booking'); 
+  const [rightPanel, setRightPanel] = useState('booking');
   const customerId =
     JSON.parse(localStorage.getItem("currentUser"))?.id || localStorage.getItem("customerId");
 
@@ -155,7 +156,9 @@ const ProviderModal = ({
       const hours = Math.floor(t / 60);
       const mins = t % 60;
       const value = `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
-      slots.push({ value, label: formatMinutesToDisplay(t) });
+      const isRecommended = (hours >= 10 && hours < 12) || (hours >= 14 && hours < 16);
+      const label = formatMinutesToDisplay(t) + (isRecommended ? " ⚡ (Least Busy)" : "");
+      slots.push({ value, label, isRecommended });
     }
 
     setTimeSlots(slots);
@@ -353,6 +356,44 @@ const ProviderModal = ({
                       max={maxDateStr}
                       aria-label="Booking date"
                     />
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '6px', marginBottom: '12px' }}>
+                      <button
+                        type="button"
+                        className="user-type-btn"
+                        style={{ padding: '4px 10px', fontSize: '0.8rem' }}
+                        onClick={() => {
+                          const d = formatForInput(new Date());
+                          setSelectedDate(d);
+                          setDateError("");
+                        }}
+                      >
+                        Today
+                      </button>
+                      <button
+                        type="button"
+                        className="user-type-btn"
+                        style={{ padding: '4px 10px', fontSize: '0.8rem' }}
+                        onClick={() => {
+                          const d = formatForInput(new Date(Date.now() + 86400000));
+                          setSelectedDate(d);
+                          setDateError("");
+                        }}
+                      >
+                        Tomorrow
+                      </button>
+                      <button
+                        type="button"
+                        className="user-type-btn"
+                        style={{ padding: '4px 10px', fontSize: '0.8rem' }}
+                        onClick={() => {
+                          const d = formatForInput(new Date(Date.now() + 7 * 86400000));
+                          setSelectedDate(d);
+                          setDateError("");
+                        }}
+                      >
+                        Next Week
+                      </button>
+                    </div>
                     {dateError && <div className="date-error">{dateError}</div>}
 
                     <label className="modal-row-label">
@@ -363,20 +404,40 @@ const ProviderModal = ({
                         No time slots available for this provider's availability.
                       </div>
                     ) : (
-                      <select
-                        className="slot-select"
-                        value={selectedSlot}
-                        onChange={(e) => {
-                          setSelectedSlot(e.target.value);
-                          setSlotError("");
-                        }}
-                      >
-                        {timeSlots.map((s) => (
-                          <option key={s.value} value={s.value}>
-                            {s.label}
-                          </option>
-                        ))}
-                      </select>
+                      <>
+                        <select
+                          className="slot-select"
+                          value={selectedSlot}
+                          onChange={(e) => {
+                            setSelectedSlot(e.target.value);
+                            setSlotError("");
+                          }}
+                        >
+                          {timeSlots.map((s) => (
+                            <option key={s.value} value={s.value}>
+                              {s.label}
+                            </option>
+                          ))}
+                        </select>
+                        {timeSlots.some(s => s.isRecommended) && (
+                          <div style={{ margin: '6px 0', fontSize: '0.85rem' }}>
+                            <span style={{ color: '#eab308', fontWeight: 600 }}>⚡ Recommended Times: </span>
+                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '4px' }}>
+                              {timeSlots.filter(s => s.isRecommended).slice(0, 3).map(s => (
+                                <button
+                                  key={s.value}
+                                  type="button"
+                                  className="user-type-btn"
+                                  style={{ padding: '2px 8px', fontSize: '0.75rem', borderColor: '#eab308', color: '#eab308' }}
+                                  onClick={() => setSelectedSlot(s.value)}
+                                >
+                                  {s.label.replace(" ⚡ (Least Busy)", "")}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
                     )}
                     {slotError && <div className="slot-error">{slotError}</div>}
                   </div>
@@ -387,15 +448,17 @@ const ProviderModal = ({
                           <strong>Services:</strong>
                           <div className="modal-subcategory-list">
                             {Object.entries(provider.subcategory).map(([name, price]) => (
-                              <label key={name} className="modal-subcategory-row">
-                                <input
-                                  type="checkbox"
-                                  checked={!!selectedServices[name]}
-                                  onChange={(e) => handleCheckboxChange(name, e.target.checked)}
-                                />
-                                <span className="modal-subcategory-name">{name}</span>
-                                <span className="modal-subcategory-price">₹ {price}</span>
-                              </label>
+                              <div key={name} className="modal-subcategory-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: '8px' }}>
+                                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer', flex: 1, margin: 0 }}>
+                                  <input
+                                    type="checkbox"
+                                    checked={!!selectedServices[name]}
+                                    onChange={(e) => handleCheckboxChange(name, e.target.checked)}
+                                  />
+                                  <span className="modal-subcategory-name">{name}</span>
+                                  <span className="modal-subcategory-price">₹ {price}</span>
+                                </label>
+                              </div>
                             ))}
                           </div>
                         </div>
@@ -464,6 +527,7 @@ const ProviderModal = ({
               provider={provider}
               onBack={() => setRightPanel('booking')}
               bookingId={booking ? booking.bookingId : null}
+              showAddButton={!!(booking && booking.status === "COMPLETED")}
             />
           )}
           {rightPanel === "chat" && (

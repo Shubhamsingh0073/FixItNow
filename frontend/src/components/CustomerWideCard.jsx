@@ -39,14 +39,21 @@ const CustomerWideCard = ({
 
   // Status options (use the ones from your dashboard)
   const bookingStatusOptions = [
-  { label: "Confirmed", value: "CONFIRMED" },
-  { label: "In Progress", value: "IN_PROGRESS" },
-  { label: "Completed", value: "COMPLETED" }
-];
+    { label: "Confirmed", value: "CONFIRMED" },
+    { label: "In Progress", value: "IN_PROGRESS" },
+    { label: "Completed", value: "COMPLETED" }
+  ];
+
+  const isEmergency = customer.bookedServices && (customer.bookedServices.emergency === true || customer.bookedServices.emergency === "true");
 
   return (
-    <div className={`provider-customer-card wide-card ${showAcceptedStatus && customer.status ? "accepted-card" : ""}`}>
-      <div className="wide-card-columns">
+    <div className={`provider-customer-card wide-card ${showAcceptedStatus && customer.status ? "accepted-card" : ""} ${isEmergency ? "emergency-card" : ""}`} style={isEmergency ? { border: '1px solid #ef4444', boxShadow: '0 0 15px rgba(239, 68, 68, 0.2)' } : {}}>
+      {isEmergency && (
+        <div className="flashing-emergency" style={{ margin: '0 0 1rem 0', borderRadius: '8px 8px 0 0', border: 'none', background: 'linear-gradient(135deg, #ef4444, #b91c1c)' }}>
+          🚨 EMERGENCY REQUEST - HIGH PRIORITY 🚨
+        </div>
+      )}
+      <div className="wide-card-columns" style={{ padding: isEmergency ? '0 1rem 1rem 1rem' : '0' }}>
         {/* Left column: customer details */}
         <div className="wide-card-left">
           <div className="customer-info">
@@ -103,8 +110,8 @@ const CustomerWideCard = ({
           </div>
         )}
       </div>
-  {/* Status and Total row at the bottom */}
-  <div className="status-total-row" style={{ marginTop: "1em", width: "100%", display: 'flex', alignItems: 'center', gap: 12 }}>
+      {/* Status and Total row at the bottom */}
+      <div className="status-total-row" style={{ marginTop: "1em", width: "100%", display: 'flex', alignItems: 'center', gap: 12 }}>
         {showDropdown && (
           <div className="booking-status-dropdown">
             <label htmlFor="booking-status-select"><strong>Status:</strong></label>
@@ -119,16 +126,16 @@ const CustomerWideCard = ({
             </select>
           </div>
         )}
-        
+
         {showAcceptedStatus && customer.status && (
-            <div className="card-info-item accepted-status">
-              Status:
-              <span
-                className={`accepted-status-label status-${customer.status.toLowerCase().replace(/ /g, "-")}`}
-              >
-                {customer.status}
-              </span>
-            </div>
+          <div className="card-info-item accepted-status">
+            Status:
+            <span
+              className={`accepted-status-label status-${customer.status.toLowerCase().replace(/ /g, "-")}`}
+            >
+              {customer.status}
+            </span>
+          </div>
         )}
 
         {showChatButton && (
@@ -156,22 +163,22 @@ const CustomerWideCard = ({
           <span className="total-label">Total:</span>
           <span className="total-value">₹{totalPrice}</span>
         </div>
-      
-      {showChat && (
-        <div className="chat-overlay" style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1200
-        }}>
-          <div style={{ width: '90%', maxWidth: 800, maxHeight: '90vh', borderRadius: 8, overflow: 'hidden' }}>
-            <ExternalChatPanel
-              currentUserId={providerId || localStorage.getItem('userId')}
-              peerId={customer.customerId || customer.userId || customer.id}
-              peerName={customer.customerName || customer.name}
-              onBack={() => setShowChat(false)}
-            />
+
+        {showChat && (
+          <div className="chat-overlay" style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1200
+          }}>
+            <div style={{ width: '90%', maxWidth: 800, maxHeight: '90vh', borderRadius: 8, overflow: 'hidden' }}>
+              <ExternalChatPanel
+                currentUserId={providerId || localStorage.getItem('userId')}
+                peerId={customer.customerId || customer.userId || customer.id}
+                peerName={customer.customerName || customer.name}
+                onBack={() => setShowChat(false)}
+              />
+            </div>
           </div>
-        </div>
-      )}
+        )}
       </div>
     </div>
   );

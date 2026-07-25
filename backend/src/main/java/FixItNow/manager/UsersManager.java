@@ -55,10 +55,10 @@ public class UsersManager {
             Services service = new Services();
             service.setId(sm.generateNextServiceId());
             service.setProvider(savedUsers); // links provider_id to users.id
-            service.setCategory("Default Category");         // <-- Set a default value
-            service.setSubcategory("Default Subcategory");   // <-- Set a default value
+            service.setCategory("Others");         // <-- Set a default value
+            service.setSubcategory("{\"General Service\": 100}");   // <-- Set a default value
             service.setDescription("Default service description"); // If nullable, can omit             // <-- Set a default value
-            service.setAvailability("{}");      
+            service.setAvailability("{\"from\": \"9:00 am\", \"to\": \"5:00 pm\"}");      
             
             sr.save(service);
         }

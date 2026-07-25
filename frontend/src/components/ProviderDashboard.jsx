@@ -33,6 +33,19 @@ function generateTimeOptions() {
 }
 const timeOptions = generateTimeOptions();
 
+async function geocodeAddress(address) {
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data && data.length > 0) {
+      return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+    }
+  } catch (err) {
+    console.error("Geocoding failed for address:", address, err);
+  }
+  return null;
+}
 
 const ProviderDashboard = () => {
   // Location state (address as text)
@@ -216,24 +229,40 @@ const ProviderDashboard = () => {
   const [selectedPeerName, setSelectedPeerName] = useState('');
   const [loadingConversations, setLoadingConversations] = useState(false);
 
-  useEffect(() => {
+  const fetchProviderBookings = async () => {
     const token = localStorage.getItem('token');
     if (!token) return;
-    fetch(`${API_BASE}/bookings/provider/me`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    })
-      .then(res => res.ok ? res.json() : Promise.reject('Failed to fetch bookings'))
-      .then(data => {
-        setProviderBookings(data); // Array of bookings as received from backend
-      })
-      .catch(err => {
-        console.error('Error fetching provider bookings:', err);
-        setProviderBookings([]);
+    try {
+      const res = await fetch(`${API_BASE}/bookings/provider/me`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
       });
+      if (!res.ok) throw new Error('Failed to fetch bookings');
+      const data = await res.json();
+
+      // Geocode each booking's customerLocation
+      const bookingsWithCoords = await Promise.all(
+        (data || []).map(async (booking) => {
+          const coords = booking.customerLocation
+            ? await geocodeAddress(booking.customerLocation)
+            : null;
+          return coords
+            ? { ...booking, ...coords }
+            : booking;
+        })
+      );
+      setProviderBookings(bookingsWithCoords);
+    } catch (err) {
+      console.error('Error fetching provider bookings:', err);
+      setProviderBookings([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchProviderBookings();
   }, []);
 
 
@@ -387,73 +416,23 @@ useEffect(() => {
 
 
   // Accept request
-  const handleAcceptRequest = (customer) => {
-
-    updateBookingStatusInBackend(customer.bookingId, "CONFIRMED");
-
-    // Update booking status in providerBookings
-      setProviderBookings(prev =>
-        prev.map(req =>
-          req.bookingId === customer.bookingId
-            ? { ...req, status: "CONFIRMED" }
-            : req
-        )
-      );
-
-    
+  const handleAcceptRequest = async (customer) => {
+    await updateBookingStatusInBackend(customer.bookingId, "CONFIRMED");
+    await fetchProviderBookings();
     setActivePage('home');
   };
 
   // Cancel request -> move to past bookings with status 'Cancelled'
-  const handleCancelRequest = (customer) => {
-      
-    updateBookingStatusInBackend(customer.bookingId, "CANCELLED");
-
-    // Update the booking status in providerBookings
-    setProviderBookings(prev =>
-      prev.map(req =>
-        req.bookingId === customer.bookingId
-          ? { ...req, status: "CANCELLED" }
-          : req
-      )
-    );
-
-    const cancelledCard = {
-      ...customer,
-      status: 'Cancelled',
-      bookingDate: customer.bookingDate || new Date().toISOString().slice(0, 10)
-    };
-
-    // Add to past bookings
-    setPastBookings(prev => [cancelledCard, ...prev]);
-
-    // Optionally navigate to bookings tab
+  const handleCancelRequest = async (customer) => {
+    await updateBookingStatusInBackend(customer.bookingId, "CANCELLED");
+    await fetchProviderBookings();
     setActivePage('bookings');
   };
 
   // Change status in bookings
-  const handleBookingStatusChange = (bookingId, newStatus) => {
-    // Update backend
-    updateBookingStatusInBackend(bookingId, newStatus);
-
-    // Update status in providerBookings
-    setProviderBookings(prev =>
-      prev.map(b =>
-        b.bookingId === bookingId ? { ...b, status: newStatus } : b
-      )
-    );
-
-    setAcceptedRequest(prev => prev && prev.bookingId === bookingId
-      ? { ...prev, status: newStatus }
-      : prev
-    );
-
-    // If status is changed to COMPLETED, move to past bookings
-    if (newStatus === "COMPLETED") {
-      const completedCard = providerBookings.find(b => b.bookingId === bookingId);
-      setPastBookings(prev => [completedCard, ...prev]);
-      setAcceptedRequest(null);
-    }
+  const handleBookingStatusChange = async (bookingId, newStatus) => {
+    await updateBookingStatusInBackend(bookingId, newStatus);
+    await fetchProviderBookings();
   };
 
 
@@ -676,37 +655,48 @@ useEffect(() => {
                 )}
               </div>
             </div>
-            {providerBookings
-              .filter(booking => booking.status === "CONFIRMED" || booking.status === "IN_PROGRESS")
-              .map(booking => (
-                <CustomerWideCard
-                  key={booking.bookingId}
-                  customer={booking}
-                  showAcceptedStatus={true}
-                  showMap={true}
-                  showDropdown={false}
-                  currentBookingStatus={booking.status}
-                  handleBookingStatusChange={handleBookingStatusChange}
-                   showChatButton={false}
-                  providerId={userData?.id || localStorage.getItem('userId')}
-                />
-              ))
-            }
+            {providerBookings.filter(booking => booking.status === "CONFIRMED" || booking.status === "IN_PROGRESS").length === 0 ? (
+              <div className="no-bookings-text" style={{ textAlign: 'center', marginBottom: '2rem' }}>
+                No active customers near you.
+              </div>
+            ) : (
+              providerBookings
+                .filter(booking => booking.status === "CONFIRMED" || booking.status === "IN_PROGRESS")
+                .map(booking => (
+                  <CustomerWideCard
+                    key={booking.bookingId}
+                    customer={booking}
+                    showAcceptedStatus={true}
+                    showMap={true}
+                    showDropdown={false}
+                    currentBookingStatus={booking.status}
+                    handleBookingStatusChange={handleBookingStatusChange}
+                     showChatButton={false}
+                    providerId={userData?.id || localStorage.getItem('userId')}
+                  />
+                ))
+            )}
             <div style={{ marginTop: acceptedRequest ? '2.2rem' : 0 }}>
               <h2 className="dashboard-header-bold-white" style={{ fontSize: '1.25rem', marginBottom: '1rem' }}>Customer Requests</h2>
               <div className="customers-grid">
-                {providerBookings
-                  .filter(booking => booking.status === "PENDING")
-                  .map(booking => (
-                  <CustomerSmallCard
-                    key={booking.bookingId}
-                    booking={booking}
-                    showAccept={true}
-                    acceptedStatus={booking.status === 'CONFIRMED'}
-                    handleAcceptRequest={handleAcceptRequest}
-                    handleCancelRequest={handleCancelRequest}
-                  />
-                ))}
+                {providerBookings.filter(booking => booking.status === "PENDING").length === 0 ? (
+                  <div className="no-bookings-text" style={{ gridColumn: '1/-1', textAlign: 'center', padding: '1rem' }}>
+                    No pending customer requests.
+                  </div>
+                ) : (
+                  providerBookings
+                    .filter(booking => booking.status === "PENDING")
+                    .map(booking => (
+                      <CustomerSmallCard
+                        key={booking.bookingId}
+                        booking={booking}
+                        showAccept={true}
+                        acceptedStatus={booking.status === 'CONFIRMED'}
+                        handleAcceptRequest={handleAcceptRequest}
+                        handleCancelRequest={handleCancelRequest}
+                      />
+                    ))
+                )}
               </div>
             </div>
           </div>
@@ -764,34 +754,46 @@ useEffect(() => {
           <div className="bookings-page">
             <h2 className="dashboard-header-bold-white">Current Bookings</h2>
             <div className="customers-grid">
-              {providerBookings
-                .filter(booking => booking.status === "CONFIRMED" || booking.status === "IN_PROGRESS")
-                .map(booking => (
-                  <CustomerWideCard
-                    key={booking.bookingId}
-                    customer={booking}
-                    showAcceptedStatus={false}
-                    showMap={false}
-                    showDropdown={true}
-                    currentBookingStatus={booking.status}
-                    handleBookingStatusChange={newStatus => handleBookingStatusChange(booking.bookingId, newStatus)}
-                    providerId={userData?.id || localStorage.getItem('userId')}
-                    showChatButton={false}
-                  />
-                ))}
+              {providerBookings.filter(booking => booking.status === "CONFIRMED" || booking.status === "IN_PROGRESS").length === 0 ? (
+                <div className="no-bookings-text" style={{ gridColumn: '1/-1' }}>
+                  No current bookings yet.
+                </div>
+              ) : (
+                providerBookings
+                  .filter(booking => booking.status === "CONFIRMED" || booking.status === "IN_PROGRESS")
+                  .map(booking => (
+                    <CustomerWideCard
+                      key={booking.bookingId}
+                      customer={booking}
+                      showAcceptedStatus={false}
+                      showMap={false}
+                      showDropdown={true}
+                      currentBookingStatus={booking.status}
+                      handleBookingStatusChange={newStatus => handleBookingStatusChange(booking.bookingId, newStatus)}
+                      providerId={userData?.id || localStorage.getItem('userId')}
+                      showChatButton={false}
+                    />
+                  ))
+              )}
             </div>
             <h2 className="dashboard-header-bold-white">Past Bookings</h2>
             <div className="customers-grid">
-              {providerBookings
-                .filter(booking => booking.status === "COMPLETED" || booking.status === "CANCELLED")
-                .map(booking => (
-                  <CustomerSmallCard
-                    key={booking.bookingId}
-                    booking={booking}
-                    showAccept={false}
-                    acceptedStatus={booking.status === 'COMPLETED' || booking.status === 'CANCELLED'}
-                  />
-                ))}
+              {providerBookings.filter(booking => booking.status === "COMPLETED" || booking.status === "CANCELLED").length === 0 ? (
+                <div className="no-bookings-text" style={{ gridColumn: '1/-1' }}>
+                  No past bookings.
+                </div>
+              ) : (
+                providerBookings
+                  .filter(booking => booking.status === "COMPLETED" || booking.status === "CANCELLED")
+                  .map(booking => (
+                    <CustomerSmallCard
+                      key={booking.bookingId}
+                      booking={booking}
+                      showAccept={false}
+                      acceptedStatus={booking.status === 'COMPLETED' || booking.status === 'CANCELLED'}
+                    />
+                  ))
+              )}
             </div>
           </div>
         )}
@@ -928,7 +930,7 @@ useEffect(() => {
                 ) : (
                   <table style={{width: '100%', borderCollapse: 'collapse'}}>
                     <thead>
-                      <tr style={{background: '#faf5ff'}}>
+                      <tr style={{background: 'transparent'}}>
                         <th style={{textAlign: 'left', padding: '0.6rem'}}>Service</th>
                         <th style={{textAlign: 'right', padding: '0.6rem'}}>Price (₹)</th>
                         <th style={{textAlign: 'center', padding: '0.6rem'}}>Actions</th>

@@ -39,18 +39,32 @@ const ChatPanel = ({ currentUserId, peerId, peerName = "Peer", onBack }) => {
   const wsRef = useRef(null);
   const messagesEndRef = useRef(null);
 
-  // canonical current user id (string), fallback to localStorage
-  const myId = normalizeId(currentUserId ?? localStorage.getItem("userId"));
+  const getStoredUserId = () => {
+    const direct = localStorage.getItem("userId");
+    if (direct) return direct;
+    try {
+      const userObj = JSON.parse(localStorage.getItem("currentUser"));
+      if (userObj && (userObj.id || userObj.userId || userObj._id || userObj.email)) {
+        return userObj.id || userObj.userId || userObj._id || userObj.email;
+      }
+    } catch (_) {}
+    return "";
+  };
+
+  const myId = normalizeId(currentUserId || getStoredUserId());
 
   // helper to map server/history message object to our shape with normalized ids
   const mapServerMessage = (m) => {
     const id = m.id ?? m.messageId ?? m.message_id ?? "";
+    const rawFrom = m.from ?? m.senderId ?? m.sender_id ?? m.sender ?? m.userId ?? m.user_id;
+    const rawTo = m.to ?? m.receiverId ?? m.receiver_id ?? m.receiver ?? m.peerId ?? m.peer_id;
     return {
       id: id,
-      from: normalizeId(m.from),
-      to: normalizeId(m.to),
+      from: normalizeId(rawFrom),
+      to: normalizeId(rawTo),
       content: m.content,
       sentAt: m.sentAt || m.createdAt || m.timestamp || m.time || null,
+      pending: !!m.pending,
     };
   };
 
@@ -88,7 +102,7 @@ const ChatPanel = ({ currentUserId, peerId, peerName = "Peer", onBack }) => {
           const exists = prev.some(m => (m.id && incoming.id && String(m.id) === String(incoming.id)));
           if (exists) return prev;
         }
-        return [...prev, { id: incoming.id || `msg-${Date.now()}-${Math.random().toString(36).slice(2,6)}`, from: incoming.from, to: incoming.to, content: incoming.content, sentAt: incoming.sentAt }];
+        return [...prev, { id: incoming.id || `msg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, from: incoming.from, to: incoming.to, content: incoming.content, sentAt: incoming.sentAt }];
       });
 
     } catch (err) {
@@ -134,7 +148,7 @@ const ChatPanel = ({ currentUserId, peerId, peerName = "Peer", onBack }) => {
     return () => {
       try {
         if (ws && ws.readyState === WebSocket.OPEN) ws.close();
-      } catch (_) {}
+      } catch (_) { }
     };
   }, []); // run once on mount
 
@@ -225,17 +239,73 @@ const ChatPanel = ({ currentUserId, peerId, peerName = "Peer", onBack }) => {
           .filter((m) => m)
           .map((m, i) => {
             const fromId = normalizeId(m.from);
-            const mine = fromId && fromId === myId;
+            const toId = normalizeId(m.to);
+            const targetPeerId = normalizeId(peerId);
+            const currentMyId = normalizeId(myId || currentUserId || getStoredUserId());
+
+            const same = (a, b) => a && b && String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
+
+            let mine = false;
+            if (same(fromId, currentMyId)) {
+              mine = true;
+            } else if (same(fromId, targetPeerId)) {
+              mine = false;
+            } else if (same(toId, targetPeerId)) {
+              mine = true;
+            } else if (same(toId, currentMyId)) {
+              mine = false;
+            } else if (fromId && targetPeerId && !same(fromId, targetPeerId)) {
+              mine = true;
+            }
+
+            const rowStyle = {
+              display: 'flex',
+              width: '100%',
+              justifyContent: mine ? 'flex-end' : 'flex-start',
+              marginBottom: '14px',
+            };
+
+            const bubbleStyle = mine
+              ? {
+                  maxWidth: '72%',
+                  padding: '12px 16px',
+                  borderRadius: '16px 16px 4px 16px',
+                  background: 'linear-gradient(135deg, #7c3aed 0%, #6366f1 100%)',
+                  color: '#ffffff',
+                  marginLeft: 'auto',
+                  marginRight: '0',
+                  boxShadow: '0 4px 15px rgba(124, 58, 237, 0.3)',
+                  position: 'relative',
+                  wordBreak: 'break-word',
+                }
+              : {
+                  maxWidth: '72%',
+                  padding: '12px 16px',
+                  borderRadius: '16px 16px 16px 4px',
+                  background: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  color: '#ffffff',
+                  marginRight: 'auto',
+                  marginLeft: '0',
+                  boxShadow: '0 4px 15px rgba(0, 0, 0, 0.2)',
+                  position: 'relative',
+                  wordBreak: 'break-word',
+                };
+
             return (
-              <div key={m.id || i} className={`message-row ${mine ? "mine" : "other"}`}>
-                <div className={`message-bubble ${mine ? "mine" : "other"}`}>
-                  {!mine && <div className="message-sender">{m.from}</div>}
+              <div key={m.id || i} className={`message-row ${mine ? "mine" : "other"}`} style={rowStyle}>
+                <div className={`message-bubble ${mine ? "mine" : "other"}`} style={bubbleStyle}>
+                  {!mine && (
+                    <div className="message-sender" style={{ fontWeight: 600, color: '#a78bfa', fontSize: '13px', marginBottom: '6px' }}>
+                      {peerName || m.from}
+                    </div>
+                  )}
                   <div className="message-content">{m.content}</div>
-                  <div className="message-meta">
+                  <div className="message-meta" style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', marginTop: '8px', fontSize: '11px', color: 'rgba(255,255,255,0.7)' }}>
                     <div className="timestamp">
                       {m.sentAt ? new Date(m.sentAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}
                     </div>
-                    {m.pending && <div style={{ fontSize: 11, color: "#888", marginLeft: 8 }}>Sending…</div>}
+                    {m.pending && <div style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", marginLeft: 8 }}>Sending…</div>}
                   </div>
                 </div>
               </div>

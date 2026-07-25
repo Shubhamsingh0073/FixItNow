@@ -702,26 +702,34 @@ const AdminDashboard = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {customers.map((c, i) => (
-                    <tr key={i}>
-                      <td>{c.id}</td>
-                      <td>{c.name}</td>
-                      <td>{c.email}</td>
-                      <td>
-                        <button className="admin-connect-button" onClick={() => setSelectedCustomer(c)}>
-                          See Details
-                        </button>
+                  {customers.length === 0 ? (
+                    <tr>
+                      <td colSpan={manageUsers ? 6 : 5} style={{ textAlign: "center", color: "var(--text-muted)", padding: "20px" }}>
+                        No customers registered yet.
                       </td>
-                      <td>{c.createdOn}</td>
-                      {manageUsers && (
+                    </tr>
+                  ) : (
+                    customers.map((c, i) => (
+                      <tr key={i}>
+                        <td>{c.id}</td>
+                        <td>{c.name}</td>
+                        <td>{c.email}</td>
                         <td>
-                          <button className="delete-btn" onClick={() => handleDeleteUser(i)}>
-                            Delete
+                          <button className="admin-connect-button" onClick={() => setSelectedCustomer(c)}>
+                            See Details
                           </button>
                         </td>
-                      )}
-                    </tr>
-                  ))}
+                        <td>{c.createdOn}</td>
+                        {manageUsers && (
+                          <td>
+                            <button className="delete-btn" onClick={() => handleDeleteUser(i)}>
+                              Delete
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -782,24 +790,32 @@ const AdminDashboard = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {approvedProviders.map((p, i) => (
-                    <tr key={i}>
-                      <td>{p.id}</td>
-                      <td>{p.provider?.name}</td>
-                      <td>{p.category}</td>
-                      <td>
-                        <button className="admin-connect-button" onClick={() => setSelectedProvider(p.provider ?? p)}>
-                          See Details
-                        </button>
-                      </td>                  
-                      <td>{p.provider?.createdOn}</td>
-                      {manageProviders && (
-                        <td>
-                          <button className="delete-btn" onClick={() => handleDeleteProvider(i)}>Delete</button>
+                  {approvedProviders.length === 0 ? (
+                    <tr>
+                      <td colSpan={manageProviders ? 6 : 5} style={{ textAlign: "center", color: "var(--text-muted)", padding: "20px" }}>
+                        No approved service providers yet.
                       </td>
-                      )}
                     </tr>
-                  ))}
+                  ) : (
+                    approvedProviders.map((p, i) => (
+                      <tr key={i}>
+                        <td>{p.id}</td>
+                        <td>{p.provider?.name}</td>
+                        <td>{p.category}</td>
+                        <td>
+                          <button className="admin-connect-button" onClick={() => setSelectedProvider(p.provider ?? p)}>
+                            See Details
+                          </button>
+                        </td>                  
+                        <td>{p.provider?.createdOn}</td>
+                        {manageProviders && (
+                          <td>
+                            <button className="delete-btn" onClick={() => handleDeleteProvider(i)}>Delete</button>
+                          </td>
+                        )}
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -885,50 +901,58 @@ const AdminDashboard = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {providersSorted.map((p, i) => (
-                    <tr key={p.id ?? p._id ?? i}>
-                      <td>{p.id}</td>
-                      <td>{p.provider?.name}</td>
-                      <td>
-                        <button
-                          className="admin-connect-button"
-                          onClick={() => handleSeeDocument(p.provider ?? p)}
-                          disabled={docLoading}
-                        >
-                          {docLoading ? "Loading..." : "See Document"}
-                        </button>
+                  {providersSorted.length === 0 ? (
+                    <tr>
+                      <td colSpan={manageProviders ? 6 : 5} style={{ textAlign: "center", color: "var(--text-muted)", padding: "20px" }}>
+                        No providers submitted verification documents yet.
                       </td>
-                      <td>
-                        <span className={`status ${String(p.verified ?? "").toLowerCase()}`}>{p.verified}</span>
-                      </td>
-                      <td>{p.provider?.createdOn}</td>
-                      {manageProviders && (
-                        <td>
-                          {String(p.verified ?? "").toLowerCase() === "pending" ? (
-                            <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-                              <button
-                                className="approve-btn"
-                                onClick={() => updateProviderVerification(p, "APPROVED")}
-                                disabled={processingServiceId === (p.id ?? p._id ?? p.provider?.id)}
-                                title="Approve provider"
-                              >
-                                <FaCheck />
-                              </button>
-
-                              <button
-                                className="reject-btn"
-                                onClick={() => updateProviderVerification(p, "REJECTED")}
-                                disabled={processingServiceId === (p.id ?? p._id ?? p.provider?.id)}
-                                title="Reject provider"
-                              >
-                                <FaTimes />
-                              </button>
-                            </div>
-                          ) : 'NA'}
-                        </td>
-                      )}
                     </tr>
-                  ))}
+                  ) : (
+                    providersSorted.map((p, i) => (
+                      <tr key={p.id ?? p._id ?? i}>
+                        <td>{p.id}</td>
+                        <td>{p.provider?.name}</td>
+                        <td>
+                          <button
+                            className="admin-connect-button"
+                            onClick={() => handleSeeDocument(p.provider ?? p)}
+                            disabled={docLoading}
+                          >
+                            {docLoading ? "Loading..." : "See Document"}
+                          </button>
+                        </td>
+                        <td>
+                          <span className={`status ${String(p.verified ?? "").toLowerCase()}`}>{p.verified}</span>
+                        </td>
+                        <td>{p.provider?.createdOn}</td>
+                        {manageProviders && (
+                          <td>
+                            {String(p.verified ?? "").toLowerCase() === "pending" ? (
+                              <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                                <button
+                                  className="approve-btn"
+                                  onClick={() => updateProviderVerification(p, "APPROVED")}
+                                  disabled={processingServiceId === (p.id ?? p._id ?? p.provider?.id)}
+                                  title="Approve provider"
+                                >
+                                  <FaCheck />
+                                </button>
+
+                                <button
+                                  className="reject-btn"
+                                  onClick={() => updateProviderVerification(p, "REJECTED")}
+                                  disabled={processingServiceId === (p.id ?? p._id ?? p.provider?.id)}
+                                  title="Reject provider"
+                                >
+                                  <FaTimes />
+                                </button>
+                              </div>
+                            ) : 'NA'}
+                          </td>
+                        )}
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -949,17 +973,25 @@ const AdminDashboard = () => {
                 </tr>
               </thead>
               <tbody>
-                {bookings.map((b, i) => (
-                  <tr key={i}>
-                    <td>{b.id}</td>
-                    <td>{b.customer.name}</td>
-                    <td>{b.provider.name}</td>
-                    <td>{b.service.category}</td>
-                    <td>
-                      <span className={`status ${b.status.replace(" ", "").toLowerCase()}`}>{b.status}</span>
+                {bookings.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} style={{ textAlign: "center", color: "var(--text-muted)", padding: "20px" }}>
+                      No bookings registered yet.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  bookings.map((b, i) => (
+                    <tr key={i}>
+                      <td>{b.id}</td>
+                      <td>{b.customer.name}</td>
+                      <td>{b.provider.name}</td>
+                      <td>{b.service.category}</td>
+                      <td>
+                        <span className={`status ${b.status.replace(" ", "").toLowerCase()}`}>{b.status}</span>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -990,58 +1022,66 @@ const AdminDashboard = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {reportsOnly.map((r, i) => {
-                    const reportedByName = r.reportedBy?.name ?? r.reportedByName ?? r.reportedById ?? 'Unknown';
-                    const reportedOnName = r.reportedOn?.name ?? r.reportedOnName ?? r.reportedOnId ?? 'Unknown';
-                    const created = r.createdAt ? new Date(r.createdAt).toLocaleString() : (r.createdOn ?? '');
-                    const status = r.status ?? r.state ?? 'UNKNOWN';
+                  {reportsOnly.length === 0 ? (
+                    <tr>
+                      <td colSpan={manageReports ? 7 : 6} style={{ textAlign: "center", color: "var(--text-muted)", padding: "20px" }}>
+                        No reports filed yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    reportsOnly.map((r, i) => {
+                      const reportedByName = r.reportedBy?.name ?? r.reportedByName ?? r.reportedById ?? 'Unknown';
+                      const reportedOnName = r.reportedOn?.name ?? r.reportedOnName ?? r.reportedOnId ?? 'Unknown';
+                      const created = r.createdAt ? new Date(r.createdAt).toLocaleString() : (r.createdOn ?? '');
+                      const status = r.status ?? r.state ?? 'UNKNOWN';
 
-                    return (
-                      <tr key={r.id ?? i}>
-                        <td>{r.id}</td>
-                        <td>{reportedByName}</td>
-                        <td>{reportedOnName}</td>
-                        <td>{r.reason}</td>
-                        <td>{created}</td>
-                        <td><span className={`status ${String(status).toLowerCase()}`}>{status}</span></td>
+                      return (
+                        <tr key={r.id ?? i}>
+                          <td>{r.id}</td>
+                          <td>{reportedByName}</td>
+                          <td>{reportedOnName}</td>
+                          <td>{r.reason}</td>
+                          <td>{created}</td>
+                          <td><span className={`status ${String(status).toLowerCase()}`}>{status}</span></td>
 
-                        {manageReports && (
-                        <td>
-                          <div style={{ display: 'flex', gap: 8 }}>
-                            {(() => {
-                              const isFinal = ['APPROVED', 'REJECTED'].includes(String(r.status ?? '').toUpperCase());
-                              const disabled = processingReportId === r.id || isFinal;
+                          {manageReports && (
+                          <td>
+                            <div style={{ display: 'flex', gap: 8 }}>
+                              {(() => {
+                                const isFinal = ['APPROVED', 'REJECTED'].includes(String(r.status ?? '').toUpperCase());
+                                const disabled = processingReportId === r.id || isFinal;
 
-                              return (
-                                <>
-                                  <button
-                                    className="approve-btn"
-                                    title="Approve"
-                                    onClick={() => openActionModal && openActionModal(r, 'approved')}
-                                    disabled={disabled}
-                                    aria-disabled={disabled}
-                                  >
-                                    <FaCheck />
-                                  </button>
+                                return (
+                                  <>
+                                    <button
+                                      className="approve-btn"
+                                      title="Approve"
+                                      onClick={() => openActionModal && openActionModal(r, 'approved')}
+                                      disabled={disabled}
+                                      aria-disabled={disabled}
+                                    >
+                                      <FaCheck />
+                                    </button>
 
-                                  <button
-                                    className="reject-btn"
-                                    title="Reject"
-                                    onClick={() => openActionModal && openActionModal(r, 'reject')}
-                                    disabled={disabled}
-                                    aria-disabled={disabled}
-                                  >
-                                    <FaTimes />
-                                  </button>
-                                </>
-                              );
-                            })()}
-                          </div>
-                        </td>
-                      )}
-                      </tr>
-                    );
-                  })}
+                                    <button
+                                      className="reject-btn"
+                                      title="Reject"
+                                      onClick={() => openActionModal && openActionModal(r, 'reject')}
+                                      disabled={disabled}
+                                      aria-disabled={disabled}
+                                    >
+                                      <FaTimes />
+                                    </button>
+                                  </>
+                                );
+                              })()}
+                            </div>
+                          </td>
+                        )}
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
@@ -1072,57 +1112,65 @@ const AdminDashboard = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {refundsOnly.map((r, i) => {
-                    const reportedByName = r.reportedBy?.name ?? r.reportedByName ?? r.reportedById ?? 'Unknown';
-                    const reportedOnName = r.reportedOn?.name ?? r.reportedOnName ?? r.reportedOnId ?? 'Unknown';
-                    const created = r.createdAt ? new Date(r.createdAt).toLocaleString() : (r.createdOn ?? '');
-                    const status = r.status ?? r.state ?? 'UNKNOWN';
+                  {refundsOnly.length === 0 ? (
+                    <tr>
+                      <td colSpan={manageRefunds ? 6 : 5} style={{ textAlign: "center", color: "var(--text-muted)", padding: "20px" }}>
+                        No refund requests submitted yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    refundsOnly.map((r, i) => {
+                      const reportedByName = r.reportedBy?.name ?? r.reportedByName ?? r.reportedById ?? 'Unknown';
+                      const reportedOnName = r.reportedOn?.name ?? r.reportedOnName ?? r.reportedOnId ?? 'Unknown';
+                      const created = r.createdAt ? new Date(r.createdAt).toLocaleString() : (r.createdOn ?? '');
+                      const status = r.status ?? r.state ?? 'UNKNOWN';
 
-                    return (
-                      <tr key={r.id ?? i}>
-                        <td>{r.id}</td>
-                        <td>{reportedByName}</td>                      
-                        <td>{r.reason}</td>
-                        <td>{created}</td>
-                        <td><span className={`status ${String(status).toLowerCase()}`}>{status}</span></td>
+                      return (
+                        <tr key={r.id ?? i}>
+                          <td>{r.id}</td>
+                          <td>{reportedByName}</td>                      
+                          <td>{r.reason}</td>
+                          <td>{created}</td>
+                          <td><span className={`status ${String(status).toLowerCase()}`}>{status}</span></td>
 
-                        {manageRefunds && (
-                        <td>
-                          <div style={{ display: 'flex', gap: 8 }}>
-                            {(() => {
-                              const isFinal = ['APPROVED', 'REJECTED'].includes(String(r.status ?? '').toUpperCase());
-                              const disabled = processingReportId === r.id || isFinal;
+                          {manageRefunds && (
+                          <td>
+                            <div style={{ display: 'flex', gap: 8 }}>
+                              {(() => {
+                                const isFinal = ['APPROVED', 'REJECTED'].includes(String(r.status ?? '').toUpperCase());
+                                const disabled = processingReportId === r.id || isFinal;
 
-                              return (
-                                <>
-                                  <button
-                                    className="approve-btn"
-                                    title="Approve refund"
-                                    onClick={() => openActionModal && openActionModal(r, 'approved')}
-                                    disabled={disabled}
-                                    aria-disabled={disabled}
-                                  >
-                                    <FaCheck />
-                                  </button>
+                                return (
+                                  <>
+                                    <button
+                                      className="approve-btn"
+                                      title="Approve refund"
+                                      onClick={() => openActionModal && openActionModal(r, 'approved')}
+                                      disabled={disabled}
+                                      aria-disabled={disabled}
+                                    >
+                                      <FaCheck />
+                                    </button>
 
-                                  <button
-                                    className="reject-btn"
-                                    title="Reject refund"
-                                    onClick={() => openActionModal && openActionModal(r, 'reject')}
-                                    disabled={disabled}
-                                    aria-disabled={disabled}
-                                  >
-                                    <FaTimes />
-                                  </button>
-                                </>
-                              );
-                            })()}
-                          </div>
-                        </td>
-                      )}
-                      </tr>
-                    );
-                  })}
+                                    <button
+                                      className="reject-btn"
+                                      title="Reject refund"
+                                      onClick={() => openActionModal && openActionModal(r, 'reject')}
+                                      disabled={disabled}
+                                      aria-disabled={disabled}
+                                    >
+                                      <FaTimes />
+                                    </button>
+                                  </>
+                                );
+                              })()}
+                            </div>
+                          </td>
+                        )}
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>

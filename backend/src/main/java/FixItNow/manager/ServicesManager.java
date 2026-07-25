@@ -47,10 +47,10 @@ public class ServicesManager {
         Services service = new Services();
         service.setId(generateNextServiceId());
         service.setProvider(provider); // links provider_id to users.id
-        service.setCategory("Default Category");
-        service.setSubcategory("Default Subcategory");
-        service.setDescription("Default description for new provider");
-        service.setAvailability("{\"Monday\": \"9-5\"}");
+        service.setCategory("Others");
+        service.setSubcategory("{\"General Service\": 100}");
+        service.setDescription("Default service description");
+        service.setAvailability("{\"from\": \"9:00 am\", \"to\": \"5:00 pm\"}");
         return sr.save(service);
     }
     

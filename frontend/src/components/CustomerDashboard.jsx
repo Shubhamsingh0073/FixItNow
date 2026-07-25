@@ -23,6 +23,7 @@ L.Icon.Default.mergeOptions({
 
 const categories = [
   { id: 'all', name: 'All Services' },
+  { id: 'favorites', name: 'Favorites ❤️' },
   { id: 'plumbing', name: 'Plumbing' },
   { id: 'electrical', name: 'Electrical' },
   { id: 'carpentry', name: 'Carpentry' },
@@ -52,12 +53,281 @@ const CustomerDashboard = () => {
   const [currentUser, setCurrentUser] = useState({ name: 'Customer Name', email: 'customer@email.com', phone: '' });
   const [userData, setUserData] = useState(null);
 
+  // Premium Features States
+  const [favorites, setFavorites] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('favorites')) || [];
+    } catch {
+      return [];
+    }
+  });
+  const [isEmergencyMode, setIsEmergencyMode] = useState(false);
+  const [cart, setCart] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('bookingCart')) || [];
+    } catch {
+      return [];
+    }
+  });
+  const [isCartOpen, setIsCartOpen] = useState(false);
+
+  // Live Tracking state
+  const [trackingBooking, setTrackingBooking] = useState(null);
+  const [providerTrackCoords, setProviderTrackCoords] = useState(null);
+  const [customerTrackCoords, setCustomerTrackCoords] = useState(null);
+  const [trackingEta, setTrackingEta] = useState(15);
+  const [trackingIntervalId, setTrackingIntervalId] = useState(null);
+
+  const getProviderDistance = (provider) => {
+    if (!latLng || !provider.lat || !provider.lng) return null;
+    const lat1 = latLng.lat;
+    const lon1 = latLng.lng;
+    const lat2 = provider.lat;
+    const lon2 = provider.lng;
+
+    const R = 6371; // km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
+  const toggleFavorite = (id) => {
+    const updated = favorites.includes(id)
+      ? favorites.filter(fid => fid !== id)
+      : [...favorites, id];
+    setFavorites(updated);
+    localStorage.setItem('favorites', JSON.stringify(updated));
+  };
+
+  const saveCart = (updatedCart) => {
+    setCart(updatedCart);
+    localStorage.setItem('bookingCart', JSON.stringify(updatedCart));
+  };
+
+  const addToCart = (provider, serviceName, price) => {
+    const itemExists = cart.some(item => item.providerId === provider.id && item.serviceName === serviceName);
+    if (itemExists) {
+      alert("Service is already in your booking cart!");
+      return;
+    }
+    const updated = [...cart, {
+      providerId: provider.id,
+      providerName: provider.name,
+      providerCategory: provider.category,
+      providerAvailability: provider.availability,
+      subcategory: provider.subcategory,
+      serviceName,
+      price,
+      bookingDate: formatForInput(new Date(Date.now() + 86400000)), // tomorrow
+      timeSlot: provider.availability?.from ? provider.availability.from : "09:00 am"
+    }];
+    saveCart(updated);
+    alert("Added service to cart! Click the cart icon in the top header to checkout.");
+  };
+
+  const removeFromCart = (providerId, serviceName) => {
+    const updated = cart.filter(item => !(item.providerId === providerId && item.serviceName === serviceName));
+    saveCart(updated);
+  };
+
+  const handleInstantBook = async (provider) => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      alert("Please login to book.");
+      return;
+    }
+
+    const subcats = provider.subcategory ? Object.keys(provider.subcategory) : [];
+    if (subcats.length === 0) {
+      alert("No services available for this provider.");
+      return;
+    }
+    const defaultSvc = subcats[0];
+    const defaultPrice = provider.subcategory[defaultSvc];
+    const bookedServices = { [defaultSvc]: defaultPrice };
+
+    let defaultSlot = "09:00 am";
+    if (provider.availability?.from) {
+      defaultSlot = provider.availability.from;
+    }
+
+    const bookingDateStr = formatForInput(new Date());
+
+    const payload = {
+      providerId: provider.id,
+      bookingDate: bookingDateStr,
+      timeSlot: defaultSlot,
+      bookedServices: bookedServices,
+      status: "PENDING"
+    };
+
+    if (isEmergencyMode) {
+      payload.bookedServices = {
+        ...payload.bookedServices,
+        emergency: true
+      };
+    }
+
+    try {
+      const response = await fetch(`${API_BASE}/bookings/create`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) throw new Error("Instant booking failed");
+      alert(`Instant Booking placed with ${provider.name} for Today at ${defaultSlot}!`);
+      await fetchCustomerBookings();
+      setActivePage('bookings');
+    } catch (error) {
+      alert("Instant booking failed: " + error.message);
+    }
+  };
+
+  const handleRepeatBooking = async (oldBooking) => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    const provider = serviceProviders.find(p => p.id === oldBooking.providerId);
+    if (!provider) {
+      alert("The provider is no longer registered or active.");
+      return;
+    }
+
+    const bookingDateStr = formatForInput(new Date(Date.now() + 86400000));
+
+    const payload = {
+      providerId: provider.id,
+      bookingDate: bookingDateStr,
+      timeSlot: oldBooking.timeSlot || provider.availability?.from || "09:00 am",
+      bookedServices: oldBooking.bookedServices || {},
+      status: "PENDING"
+    };
+
+    try {
+      const response = await fetch(`${API_BASE}/bookings/create`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) throw new Error("Rebooking failed");
+      alert(`Successfully repeated booking with ${provider.name} for Tomorrow!`);
+      await fetchCustomerBookings();
+      setActivePage('bookings');
+    } catch (error) {
+      alert("Failed to repeat booking: " + error.message);
+    }
+  };
+
+  const startTracking = (booking) => {
+    const provider = serviceProviders.find(p => p.id === booking.providerId);
+    let cCoords = latLng || { lat: 12.9716, lng: 77.5946 };
+    let pCoords = provider && provider.lat ? { lat: provider.lat, lng: provider.lng } : { lat: 12.9300, lng: 77.5800 };
+
+    setTrackingBooking(booking);
+    setCustomerTrackCoords(cCoords);
+    setProviderTrackCoords({
+      lat: pCoords.lat + (Math.random() - 0.5) * 0.02,
+      lng: pCoords.lng + (Math.random() - 0.5) * 0.02
+    });
+    setTrackingEta(15);
+
+    if (trackingIntervalId) clearInterval(trackingIntervalId);
+
+    const interval = setInterval(() => {
+      setProviderTrackCoords(prev => {
+        if (!prev) return prev;
+        const latDiff = cCoords.lat - prev.lat;
+        const lngDiff = cCoords.lng - prev.lng;
+
+        const step = 0.15;
+        const nextLat = prev.lat + latDiff * step;
+        const nextLng = prev.lng + lngDiff * step;
+
+        setTrackingEta(prevEta => {
+          if (prevEta <= 1) return 1;
+          return prevEta - 1;
+        });
+
+        const distanceRemaining = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
+        if (distanceRemaining < 0.0005) {
+          clearInterval(interval);
+          setTrackingEta(0);
+        }
+
+        return { lat: nextLat, lng: nextLng };
+      });
+    }, 3000);
+
+    setTrackingIntervalId(interval);
+  };
+
+  const closeTracking = () => {
+    if (trackingIntervalId) clearInterval(trackingIntervalId);
+    setTrackingIntervalId(null);
+    setTrackingBooking(null);
+  };
+
+  const handleCartCheckout = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      alert("Please login to checkout.");
+      return;
+    }
+    if (cart.length === 0) return;
+
+    try {
+      const promises = cart.map(async (item) => {
+        const payload = {
+          providerId: item.providerId,
+          bookingDate: item.bookingDate,
+          timeSlot: item.timeSlot,
+          bookedServices: { [item.serviceName]: item.price },
+          status: "PENDING"
+        };
+        if (isEmergencyMode) {
+          payload.bookedServices.emergency = true;
+        }
+        const res = await fetch(`${API_BASE}/bookings/create`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) throw new Error(`Failed to checkout item from ${item.providerName}`);
+      });
+
+      await Promise.all(promises);
+      alert("All bookings placed successfully!");
+      saveCart([]);
+      setIsCartOpen(false);
+      await fetchCustomerBookings();
+      setActivePage('bookings');
+    } catch (error) {
+      alert("Cart checkout failed: " + error.message);
+    }
+  };
+
   const customerMenu = [
-      { key: "home", label: "Home", icon: <FaHome /> },
-      { key: "bookings", label: "Bookings", icon: <FaCalendarAlt /> },
-      { key: "Chat", label: "Messages", icon: <FaFacebookMessenger /> },
-      { key: "profile", label: "Profile", icon: <FaUserCircle /> },
-    ];
+    { key: "home", label: "Home", icon: <FaHome /> },
+    { key: "bookings", label: "Bookings", icon: <FaCalendarAlt /> },
+    { key: "Chat", label: "Messages", icon: <FaFacebookMessenger /> },
+    { key: "profile", label: "Profile", icon: <FaUserCircle /> },
+  ];
 
   const [activePage, setActivePage] = useState('home');
   const [phoneInput, setPhoneInput] = useState('');
@@ -83,7 +353,7 @@ const CustomerDashboard = () => {
   const [selectedServices, setSelectedServices] = useState({});
   const [showModal, setShowModal] = useState(false);
   const [modalProvider, setModalProvider] = useState(null);
- 
+
   useEffect(() => {
     const fetchProviders = async () => {
       try {
@@ -141,11 +411,11 @@ const CustomerDashboard = () => {
 
   const [customerBookings, setCustomerBookings] = useState([]);
 
-  useEffect(() => {
+  const fetchCustomerBookings = () => {
     const token = localStorage.getItem('token');
     if (!token) return;
 
-    fetch(`${API_BASE}/bookings/customer/me`, {
+    return fetch(`${API_BASE}/bookings/customer/me`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -160,6 +430,10 @@ const CustomerDashboard = () => {
         console.error('Error fetching customer bookings:', err);
         setCustomerBookings([]);
       });
+  };
+
+  useEffect(() => {
+    fetchCustomerBookings();
   }, []);
 
 
@@ -300,23 +574,23 @@ const CustomerDashboard = () => {
   const [selectedPeerName, setSelectedPeerName] = useState('');
   const [loadingConversations, setLoadingConversations] = useState(false);
 
-  // only show providers that are approved (and match category/search)
   const filteredProviders = serviceProviders.filter(provider => {
-    // require provider to be approved for the home list
     const isApproved = (provider?.verified ?? '').toString().toLowerCase() === 'approved';
-
     if (!isApproved) return false;
 
+    if (isEmergencyMode && provider.available === false) return false;
+
     let matchesCategory = true;
-    if (selectedCategory !== 'all') {
+    if (selectedCategory === 'favorites') {
+      matchesCategory = favorites.includes(provider.id);
+    } else if (selectedCategory !== 'all') {
       matchesCategory = provider.category && provider.category.toLowerCase().includes(selectedCategory);
     }
     const matchesSearch = (provider.location || '').toLowerCase().includes(searchQuery.toLowerCase());
 
     return matchesCategory && matchesSearch;
   });
-  
-  // consider these statuses as "active" bookings that should hide a provider
+
   const ACTIVE_BOOKING_STATUSES = new Set([
     'PENDING',
     'CONFIRMED',
@@ -333,11 +607,23 @@ const CustomerDashboard = () => {
       .map(b => String(b.providerId))
   );
 
-  const homeProviders = filteredProviders.filter(p => {
-    const pid = String(p.id ?? '');
-    return !activeBookedProviderIds.has(pid);
-  });
-  
+  const homeProviders = React.useMemo(() => {
+    const list = filteredProviders.filter(p => {
+      const pid = String(p.id ?? '');
+      return !activeBookedProviderIds.has(pid);
+    });
+
+    if (isEmergencyMode) {
+      return [...list].sort((a, b) => {
+        const distA = getProviderDistance(a) ?? 999999;
+        const distB = getProviderDistance(b) ?? 999999;
+        return distA - distB;
+      });
+    }
+
+    return list;
+  }, [filteredProviders, activeBookedProviderIds, isEmergencyMode, latLng]);
+
 
   const reportBookingOptions = React.useMemo(() => {
     if (!Array.isArray(customerBookings)) return [];
@@ -351,7 +637,7 @@ const CustomerDashboard = () => {
         label,
         status: b.status
       };
-    }).filter(opt => opt.bookingId); 
+    }).filter(opt => opt.bookingId);
   }, [customerBookings, serviceProviders]);
 
   const [showRefundForm, setShowRefundForm] = useState(false);
@@ -390,7 +676,7 @@ const CustomerDashboard = () => {
 
     setReportSubmitting(true);
     try {
-      const url = `${API_BASE}/api/reports`; 
+      const url = `${API_BASE}/api/reports`;
       const token = localStorage.getItem('token');
       const payload = {
         reportedById: reporterId,
@@ -433,7 +719,7 @@ const CustomerDashboard = () => {
       setReportSubmitting(false);
     }
   };
-  
+
   useEffect(() => {
     const ADMIN_PEER_ID = 'U10';
     const ADMIN_PEER_NAME = 'Admin';
@@ -476,7 +762,7 @@ const CustomerDashboard = () => {
         const finalConvs = hasAdmin
           ? convsFromServer
           : // put admin at top
-            [{ peerId: ADMIN_PEER_ID, peerName: ADMIN_PEER_NAME, lastMessage: '', lastAt: '' }, ...convsFromServer];
+          [{ peerId: ADMIN_PEER_ID, peerName: ADMIN_PEER_NAME, lastMessage: '', lastAt: '' }, ...convsFromServer];
 
         // Remove duplicates by peerId (keeping first occurrence)
         const seen = new Set();
@@ -502,36 +788,18 @@ const CustomerDashboard = () => {
     if (activePage === 'Chat') {
       loadConversations();
       const interval = setInterval(() => {
-        loadConversations().catch(() => {});
+        loadConversations().catch(() => { });
       }, 3000);
       return () => clearInterval(interval);
     }
   }, [activePage, userData]);
 
 
-const handleConnect = (provider, bookingDate, selectedServicesFromModal, selectedSlot) => {
-  // Prepare the booked services object
-  const bookedServices = {};
-  Object.entries(selectedServicesFromModal || {})
-    .filter(([name, checked]) => checked)
-    .forEach(([name]) => {
-      bookedServices[name] = provider.subcategory[name];
-    });
-
-  // Create the new booking object as expected in your booking cards
-  const newBooking = {
-    bookingId: Date.now(), // Or get from backend later
-    providerId: provider.id,
-    status: "PENDING",
-    bookingDate,
-    timeSlot: selectedSlot,
-    bookedServices,
+  const handleConnect = async (provider, bookingDate, selectedServicesFromModal, selectedSlot) => {
+    await fetchCustomerBookings();
+    setActivePage('bookings');
+    setShowModal(false); // Close the modal
   };
-
-  setCustomerBookings(prev => [...prev, newBooking]);
-  setActivePage('bookings');
-  setShowModal(false); // Close the modal
-};
 
   const handleLogout = () => {
     localStorage.removeItem('currentUser');
@@ -596,7 +864,7 @@ const handleConnect = (provider, bookingDate, selectedServicesFromModal, selecte
     setIsEditingLocation(true);
   };
 
-   const handleSaveLocation = () => {
+  const handleSaveLocation = () => {
     const trimmed = locationInput.trim();
     if (trimmed === '') {
       setIsEditingLocation(false);
@@ -634,8 +902,22 @@ const handleConnect = (provider, bookingDate, selectedServicesFromModal, selecte
   const WideProviderCard = ({ provider, booking, onSeeDetails }) => (
     <div className="provider-card">
       <div className="provider-info">
-        <h3><b>{provider.name}</b></h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <h3><b>{provider.name}</b></h3>
+          <button
+            className={`favorite-btn ${favorites.includes(provider.id) ? 'active' : ''}`}
+            onClick={(e) => { e.stopPropagation(); toggleFavorite(provider.id); }}
+            title={favorites.includes(provider.id) ? "Remove from Favorites" : "Add to Favorites"}
+          >
+            {favorites.includes(provider.id) ? "❤️" : "🤍"}
+          </button>
+        </div>
         <p className="category-info"><FaToolbox /> <b>{provider.category}</b></p>
+        {getProviderDistance(provider) !== null && (
+          <p className="distance" style={{ fontSize: '0.9rem', color: 'var(--accent-soft)', fontWeight: 600 }}>
+            📍 {getProviderDistance(provider).toFixed(1)} km away
+          </p>
+        )}
         <p className="distance">
           <FaMapMarkerAlt color="#cf1616ff" className="map-icon" /> {
             (() => {
@@ -658,23 +940,44 @@ const handleConnect = (provider, bookingDate, selectedServicesFromModal, selecte
         )}
       </div>
       {/* Status display */}
-        {booking && booking.status && (
-          <div className="card-info-item accepted-status">
-            Status:
-            <span
-              className={`accepted-status-label status-${booking.status.toLowerCase().replace(/ /g, "-")}`}
-            >
-              {booking.status}
-            </span>
-          </div>
+      {booking && booking.status && (
+        <div className="card-info-item accepted-status" style={{ marginBottom: '10px' }}>
+          Status:
+          <span
+            className={`accepted-status-label status-${booking.status.toLowerCase().replace(/ /g, "-")}`}
+          >
+            {booking.status}
+          </span>
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: '8px', marginTop: 'auto' }}>
+        <button
+          className="connect-button"
+          style={{ flex: 1 }}
+          onClick={onSeeDetails}
+          disabled={provider.available === false}
+        >
+          {provider.available === false ? 'Currently Unavailable' : 'See Details'}
+        </button>
+        {booking && (booking.status === "CONFIRMED" || booking.status === "IN_PROGRESS") && (
+          <button
+            className="connect-button"
+            style={{ flex: 1, background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', boxShadow: '0 4px 12px rgba(59, 130, 246, 0.25)' }}
+            onClick={() => startTracking(booking)}
+          >
+            Track Live 📍
+          </button>
         )}
-      <button
-        className="connect-button"
-        onClick={onSeeDetails}
-        disabled={provider.available === false}
-      >
-        {provider.available === false ? 'Currently Unavailable' : 'See Details'}
-      </button>
+        {booking && (booking.status === "COMPLETED" || booking.status === "CANCELLED") && (
+          <button
+            className="connect-button"
+            style={{ flex: 1, background: 'linear-gradient(135deg, #10b981, #059669)', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)' }}
+            onClick={() => handleRepeatBooking(booking)}
+          >
+            Rebook ⚡
+          </button>
+        )}
+      </div>
     </div>
   );
 
@@ -682,12 +985,26 @@ const handleConnect = (provider, bookingDate, selectedServicesFromModal, selecte
   const ProviderCard = ({ provider, showBookingDate }) => (
     <div className="provider-card">
       <div className="provider-info">
-        <h3><b>{provider.name}</b></h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <h3><b>{provider.name}</b></h3>
+          <button
+            className={`favorite-btn ${favorites.includes(provider.id) ? 'active' : ''}`}
+            onClick={(e) => { e.stopPropagation(); toggleFavorite(provider.id); }}
+            title={favorites.includes(provider.id) ? "Remove from Favorites" : "Add to Favorites"}
+          >
+            {favorites.includes(provider.id) ? "❤️" : "🤍"}
+          </button>
+        </div>
         <div className="rating">
           <FaStar className="star-icon" />
           {provider.rating ? provider.rating : "4.5"} ({provider.reviews ? provider.reviews : "1"} reviews)
         </div>
         <p className="category-info"><FaToolbox /> <b>{provider.category}</b></p>
+        {getProviderDistance(provider) !== null && (
+          <p className="distance" style={{ fontSize: '0.9rem', color: 'var(--accent-soft)', fontWeight: 600 }}>
+            📍 {getProviderDistance(provider).toFixed(1)} km away
+          </p>
+        )}
         <p className="distance">
           <FaMapMarkerAlt color="#cf1616ff" className="map-icon" /> {
             (() => {
@@ -698,7 +1015,7 @@ const handleConnect = (provider, bookingDate, selectedServicesFromModal, selecte
             })()
           }
         </p>
-        
+
         <p className="contact-info"><FaPhone /> {provider.phone}</p>
         <p className="contact-info"><FaEnvelope /> {provider.email}</p>
         {showBookingDate && (
@@ -707,13 +1024,26 @@ const handleConnect = (provider, bookingDate, selectedServicesFromModal, selecte
           </div>
         )}
       </div>
-      <button
-        className="connect-button"
-        onClick={() => handleSeeDetails(provider)}
-        disabled={provider.available === false}
-      >
-        {provider.available === false ? 'Currently Unavailable' : 'See Details'}
-      </button>
+      <div style={{ display: 'flex', gap: '8px', marginTop: 'auto' }}>
+        <button
+          className="connect-button"
+          style={{ flex: 1 }}
+          onClick={() => handleSeeDetails(provider)}
+          disabled={provider.available === false}
+        >
+          {provider.available === false ? 'Currently Unavailable' : 'See Details'}
+        </button>
+        {provider.available !== false && (
+          <button
+            className="connect-button"
+            style={{ flex: 1, background: 'linear-gradient(135deg, #10b981, #059669)', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)' }}
+            onClick={() => handleInstantBook(provider)}
+            title="Book Instantly using default services and slot"
+          >
+            Instant Book
+          </button>
+        )}
+      </div>
     </div>
   );
 
@@ -728,18 +1058,18 @@ const handleConnect = (provider, bookingDate, selectedServicesFromModal, selecte
   return (
     <div className="dashboard-root">
       {/* Sidebar */}
-        <Sidebar
-          activeTab={activePage}
-          onActivate={(k) => setActivePage(k)}
-          menu={customerMenu}        
-          showLogoOnCollapsed={true}
-          handleLogout={() => {handleLogout()}}
-        />
+      <Sidebar
+        activeTab={activePage}
+        onActivate={(k) => setActivePage(k)}
+        menu={customerMenu}
+        showLogoOnCollapsed={true}
+        handleLogout={() => { handleLogout() }}
+      />
 
       <div className="dashboard-main">
         {activePage === 'home' && (
           <div>
-            <div className="dashboard-header">
+            <div className="dashboard-header" style={{ position: 'relative' }}>
               <h1 className="dashboard-header-bold-white">Find Services Near You</h1>
               <div className="location-row">
                 <FaMapMarkerAlt className="map-icon location-icon" />
@@ -784,14 +1114,29 @@ const handleConnect = (provider, bookingDate, selectedServicesFromModal, selecte
               </div>
             </div>
             <div className="search-section">
-              <div className="search-bar">
-                <FaSearch />
-                <input
-                  type="text"
-                  placeholder="Search by location..."
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                />
+              {isEmergencyMode && (
+                <div className="flashing-emergency " style={{ textAlign: 'center', color: 'red', fontSize: '1.2rem' }}>
+                  🚨 EMERGENCY MODE ACTIVE — SHOWING NEAREST AVAILABLE PROVIDERS FIRST 🚨
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '1.5rem' }}>
+                <div className="search-bar" style={{ flex: 1, marginBottom: 0 }}>
+                  <FaSearch />
+                  <input
+                    type="text"
+                    placeholder="Search by location..."
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                  />
+                </div>
+                <button
+                  type="button"
+                  className={`emergency-btn-toggle ${isEmergencyMode ? 'active' : ''}`} style={{ background: '#c50303ff', color: 'white', borderRadius: '15px',height: '50px',padding:'10px' }}
+                  onClick={() => setIsEmergencyMode(!isEmergencyMode)}
+                  title="Find available providers closest to you"
+                >
+                  🚨 Emergency Mode
+                </button>
               </div>
               <div style={{ margin: "2em 0" }}>
                 <MapContainer
@@ -831,15 +1176,21 @@ const handleConnect = (provider, bookingDate, selectedServicesFromModal, selecte
                 ))}
               </div>
             </div>
-            
+
             <div>
               {connectedProvider && homeProviders.length > 0 && (
                 <h2 className="dashboard-header-bold-white" style={{ fontSize: '1.25rem', marginBottom: '1rem' }}>Other Services</h2>
               )}
               <div className="providers-grid">
-                {homeProviders.map(provider => (
-                  <ProviderCard key={provider.id} provider={provider} />
-                ))}
+                {homeProviders.length === 0 ? (
+                  <div className="no-bookings-text" style={{ gridColumn: '1/-1', textAlign: 'center', padding: '2rem' }}>
+                    No service providers found.
+                  </div>
+                ) : (
+                  homeProviders.map(provider => (
+                    <ProviderCard key={provider.id} provider={provider} />
+                  ))
+                )}
               </div>
             </div>
           </div>
@@ -896,25 +1247,30 @@ const handleConnect = (provider, bookingDate, selectedServicesFromModal, selecte
           <div className="bookings-page">
             <h2 className="dashboard-header-bold-white">Current Bookings</h2>
             <div className="providers-grid">
-              {customerBookings
-                .filter(booking => booking.status === "PENDING" || booking.status === "CONFIRMED" || booking.status === "IN_PROGRESS")
-                .map((booking, idx) => {
-                  const provider = serviceProviders.find(p => p.id === booking.providerId);
-                  if (!provider) return null; // skip if provider not found
-                  return (
-                    <WideProviderCard
-                      key={booking.bookingId || idx}
-                      provider={provider}
-                      booking={booking}
-                      onSeeDetails={() => {
-                        setModalProvider(provider);
-                        setShowModal(true);
-                        setModalBooking(booking); // new state to hold booking info
-                      }}
-                    />
-                  );
-                })
-              }
+              {customerBookings.filter(booking => booking.status === "PENDING" || booking.status === "CONFIRMED" || booking.status === "IN_PROGRESS").length === 0 ? (
+                <div className="no-bookings-text">
+                  No current bookings yet.
+                </div>
+              ) : (
+                customerBookings
+                  .filter(booking => booking.status === "PENDING" || booking.status === "CONFIRMED" || booking.status === "IN_PROGRESS")
+                  .map((booking, idx) => {
+                    const provider = serviceProviders.find(p => p.id === booking.providerId);
+                    if (!provider) return null; // skip if provider not found
+                    return (
+                      <WideProviderCard
+                        key={booking.bookingId || idx}
+                        provider={provider}
+                        booking={booking}
+                        onSeeDetails={() => {
+                          setModalProvider(provider);
+                          setShowModal(true);
+                          setModalBooking(booking); // new state to hold booking info
+                        }}
+                      />
+                    );
+                  })
+              )}
             </div>
             <h2 className="dashboard-header-bold-white">Past Bookings</h2>
             <div className="providers-grid">
@@ -924,23 +1280,23 @@ const handleConnect = (provider, bookingDate, selectedServicesFromModal, selecte
                 </div>
               ) : (
                 customerBookings
-                .filter(booking => booking.status === "COMPLETED" || booking.status === "CANCELLED")
-                .map((booking, idx) => {
-                  const provider = serviceProviders.find(p => p.id === booking.providerId);
-                  if (!provider) return null; // skip if provider not found
-                  return (
-                    <WideProviderCard
-                      key={booking.bookingId || idx}
-                      provider={provider}
-                      booking={booking}
-                      onSeeDetails={() => {
-                        setModalProvider(provider);
-                        setShowModal(true);
-                        setModalBooking(booking); // new state to hold booking info
-                      }}
-                    />
-                  );
-                })
+                  .filter(booking => booking.status === "COMPLETED" || booking.status === "CANCELLED")
+                  .map((booking, idx) => {
+                    const provider = serviceProviders.find(p => p.id === booking.providerId);
+                    if (!provider) return null; // skip if provider not found
+                    return (
+                      <WideProviderCard
+                        key={booking.bookingId || idx}
+                        provider={provider}
+                        booking={booking}
+                        onSeeDetails={() => {
+                          setModalProvider(provider);
+                          setShowModal(true);
+                          setModalBooking(booking); // new state to hold booking info
+                        }}
+                      />
+                    );
+                  })
               )}
             </div>
           </div>
@@ -957,7 +1313,133 @@ const handleConnect = (provider, bookingDate, selectedServicesFromModal, selecte
             modalScrollTop={modalScrollTop}
             setModalScrollTop={setModalScrollTop}
             handleConnect={handleConnect}
+            addToCart={addToCart}              // Pass cart addition callback!
           />
+        )}
+
+        {trackingBooking && (
+          <div className="modal-overlay" onClick={closeTracking}>
+            <div className="modal-content tracking-modal-content" onClick={e => e.stopPropagation()}>
+              <button className="modal-close-btn" onClick={closeTracking}>×</button>
+              <div className="tracking-info-bar">
+                <h2 style={{ margin: 0, fontSize: '1.4rem', color: 'var(--text-primary)' }}>Live Provider Tracking 📍</h2>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontWeight: 'bold', color: 'var(--accent-soft)' }}>
+                    {trackingEta === 0 ? "🚨 Arrived!" : `ETA: ${trackingEta} mins`}
+                  </div>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                    Booking #{trackingBooking.bookingId}
+                  </div>
+                </div>
+              </div>
+              <div style={{ flex: 1, position: 'relative', minHeight: '350px' }}>
+                <MapContainer
+                  center={[customerTrackCoords?.lat || 12.9716, customerTrackCoords?.lng || 77.5946]}
+                  zoom={14}
+                  style={{ height: '100%', width: '100%' }}
+                >
+                  <TileLayer
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    attribution="&copy; OpenStreetMap contributors"
+                  />
+                  {customerTrackCoords && (
+                    <Marker position={[customerTrackCoords.lat, customerTrackCoords.lng]}>
+                      <Popup>Your Location</Popup>
+                    </Marker>
+                  )}
+                  {providerTrackCoords && (
+                    <Marker position={[providerTrackCoords.lat, providerTrackCoords.lng]}>
+                      <Popup>Service Provider ({getProviderNameById(trackingBooking.providerId)})</Popup>
+                    </Marker>
+                  )}
+                </MapContainer>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isCartOpen && (
+          <div className="cart-drawer-overlay" onClick={() => setIsCartOpen(false)}>
+            <div className="cart-drawer" onClick={e => e.stopPropagation()}>
+              <div className="cart-drawer-header">
+                <h2 style={{ margin: 0, fontSize: '1.4rem' }}>Booking Cart 🛒</h2>
+                <button className="cart-drawer-close" onClick={() => setIsCartOpen(false)}>×</button>
+              </div>
+              <div className="cart-items-list">
+                {cart.length === 0 ? (
+                  <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '2rem' }}>
+                    Your cart is empty.
+                  </div>
+                ) : (
+                  cart.map((item, idx) => (
+                    <div className="cart-item" key={idx}>
+                      <div className="cart-item-header">
+                        <span style={{ fontWeight: 'bold' }}>{item.providerName}</span>
+                        <button className="cart-item-remove" onClick={() => removeFromCart(item.providerId, item.serviceName)}>
+                          Remove
+                        </button>
+                      </div>
+                      <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                        Category: {item.providerCategory} | Service: {item.serviceName}
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontWeight: 'bold', color: 'var(--accent-soft)' }}>₹{item.price}</span>
+                        </div>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <input
+                            type="date"
+                            className="date-input"
+                            value={item.bookingDate}
+                            onChange={(e) => {
+                              const newCart = [...cart];
+                              newCart[idx].bookingDate = e.target.value;
+                              saveCart(newCart);
+                            }}
+                            style={{ padding: '4px 8px', fontSize: '0.85rem', width: '125px', height: '32px' }}
+                          />
+                          <select
+                            className="slot-select"
+                            value={item.timeSlot}
+                            onChange={(e) => {
+                              const newCart = [...cart];
+                              newCart[idx].timeSlot = e.target.value;
+                              saveCart(newCart);
+                            }}
+                            style={{ padding: '4px 8px', fontSize: '0.85rem', height: '32px' }}
+                          >
+                            {item.providerAvailability?.from && (
+                              <option value={item.providerAvailability.from}>{item.providerAvailability.from}</option>
+                            )}
+                            <option value="09:00 am">9:00 am</option>
+                            <option value="11:00 am">11:00 am</option>
+                            <option value="01:00 pm">1:00 pm</option>
+                            <option value="03:00 pm">3:00 pm</option>
+                            <option value="05:00 pm">5:00 pm</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+              {cart.length > 0 && (
+                <div style={{ borderTop: '1px solid var(--border)', paddingTop: '16px', marginTop: '16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '1.2rem', marginBottom: '16px' }}>
+                    <span>Total:</span>
+                    <span>₹{cart.reduce((sum, item) => sum + item.price, 0)}</span>
+                  </div>
+                  <button
+                    className="connect-button"
+                    style={{ width: '100%', padding: '12px' }}
+                    onClick={handleCartCheckout}
+                  >
+                    Book All in One Order
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
         )}
 
         {/* Profile (same as before) */}
@@ -966,7 +1448,7 @@ const handleConnect = (provider, bookingDate, selectedServicesFromModal, selecte
             {/* Section 1: Profile Details */}
             <div className="profile-info-box wide-profile-box">
               <div className="profile-info-right">
-                <h2 className="profile-reviews-heading" style={{fontSize: '1.33rem', marginBottom: '0.7rem'}}>Profile Details</h2>
+                <h2 className="profile-reviews-heading" style={{ fontSize: '1.33rem', marginBottom: '0.7rem' }}>Profile Details</h2>
                 <div className="profile-info-item"><strong>Name:</strong> {currentUser.name}</div>
                 <div className="profile-info-item"><strong>Email:</strong> {currentUser.email}</div>
                 {/* Phone */}
@@ -984,13 +1466,13 @@ const handleConnect = (provider, bookingDate, selectedServicesFromModal, selecte
                     <span style={{ color: 'red', fontSize: '0.96rem', marginLeft: '0.6rem' }}>Phone number must be 10 digits</span>
                   )}
                 </div>
-                
-                
+
+
                 {/* Edit & Save Buttons */}
-                <div style={{display: 'flex', gap: '1rem', marginTop: '1rem'}}>
+                <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                   <button
                     className="accept-request-btn"
-                    style={{background: '#6b46c1'}}
+                    style={{ background: '#6b46c1' }}
                     onClick={() => setIsEditingPhone(true)}
                     disabled={isEditingPhone}
                   >
@@ -998,7 +1480,7 @@ const handleConnect = (provider, bookingDate, selectedServicesFromModal, selecte
                   </button>
                   <button
                     className="save-phone-button"
-                    style={{background:'#2b6cb0'}}
+                    style={{ background: '#2b6cb0' }}
                     onClick={handlePhoneSave}
                     disabled={!isEditingPhone || phoneInput.length !== 10}
                   >
@@ -1070,7 +1552,7 @@ const handleConnect = (provider, bookingDate, selectedServicesFromModal, selecte
                       </button>
                     </div>
 
-                    
+
                     <div className="profile-reports-box" style={{ marginTop: 18 }}>
                       <h3 style={{ marginBottom: 10 }}>My Reports</h3>
 
@@ -1123,16 +1605,16 @@ const handleConnect = (provider, bookingDate, selectedServicesFromModal, selecte
                           ))}
                         </div>
                       )}
-                    </div> 
-                  </div>   
+                    </div>
+                  </div>
                 )}
-            
+
               </div>
               {/* Refund Request button and form */}
-              <div style={{ display: 'inline-block', marginLeft: 8 }}>
+              <div style={{ display: 'inline-block'}}>
                 <button
                   className="profile-wide-action-btn"
-                  onClick={() => setShowRefundForm(prev => !prev)}                  
+                  onClick={() => setShowRefundForm(prev => !prev)}
                 >
                   <FaMoneyBillWave className="profile-action-icon" /> Refund Request
                 </button>
@@ -1241,12 +1723,12 @@ const handleConnect = (provider, bookingDate, selectedServicesFromModal, selecte
                           ))}
                         </div>
                       )}
-                    </div> 
+                    </div>
 
                   </div>
                 )}
               </div>
-              
+
               <button className="profile-wide-action-btn">
                 <FaRegComments className="profile-action-icon" /> FAQ
               </button>
